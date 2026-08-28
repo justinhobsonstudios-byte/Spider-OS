@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import json
+import os
+import tempfile
+import threading
 import unittest
+import urllib.error
+import urllib.request
+from pathlib import Path
 from unittest.mock import patch
 
 from spider_os.cli import build_parser
+from spider_os.db import Database
+from spider_os.platform import install_server_extensions
+from spider_os.server import create_server
 from spider_os.store import FLATHUB_URL, SpiderStore
 
 
@@ -70,6 +80,75 @@ class SpiderStoreExecutionTests(unittest.TestCase):
         self.assertEqual(planned.operation, "plan")
         self.assertEqual(executing.operation, "execute")
         self.assertEqual(executing.value, "org.example.App")
+
+
+class SpiderStoreApiExecutionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.previous_data_dir = os.environ.get("SPIDER_OS_DATA_DIR")
+        os.environ["SPIDER_OS_DATA_DIR"] = self.temp.name
+        install_server_extensions()
+        self.server, _ = create_server("127.0.0.1", 0, Database(Path(self.temp.name)))
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        host, port = self.server.server_address
+        self.base = f"http://{host}:{port}"
+        with urllib.request.urlopen(self.base + "/api/bootstrap", timeout=5) as response:
+            self.token = json.load(response)["csrf_token"]
+
+    def tearDown(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        if self.previous_data_dir is None:
+            os.environ.pop("SPIDER_OS_DATA_DIR", None)
+        else:
+            os.environ["SPIDER_OS_DATA_DIR"] = self.previous_data_dir
+        self.temp.cleanup()
+
+    def post(self, body: dict) -> dict:
+        request = urllib.request.Request(
+            self.base + "/api/store/execute",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json", "X-Spider-Token": self.token},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return json.load(response)
+
+    @patch("spider_os.platform.SpiderStore.execute")
+    def test_execute_endpoint_requires_exact_app_id_confirmation(self, execute) -> None:
+        request = urllib.request.Request(
+            self.base + "/api/store/execute",
+            data=json.dumps({
+                "action": "install",
+                "app_id": "org.example.App",
+                "confirmation": "org.example.Other",
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json", "X-Spider-Token": self.token},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request, timeout=5)
+        self.assertEqual(caught.exception.code, 400)
+        execute.assert_not_called()
+
+    @patch("spider_os.platform.SpiderStore.execute")
+    def test_execute_endpoint_calls_store_only_after_confirmation(self, execute) -> None:
+        execute.return_value = {
+            "action": "install",
+            "app_id": "org.example.App",
+            "scope": "user",
+            "executed": True,
+        }
+        payload = self.post({
+            "action": "install",
+            "app_id": "org.example.App",
+            "remote": "flathub",
+            "confirmation": "org.example.App",
+        })
+        self.assertTrue(payload["result"]["executed"])
+        execute.assert_called_once_with("install", "org.example.App", "flathub")
 
 
 if __name__ == "__main__":
