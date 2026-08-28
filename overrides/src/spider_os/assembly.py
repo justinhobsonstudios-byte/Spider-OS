@@ -12,7 +12,8 @@ from typing import Any
 from .constants import AI_NAME, APP_NAME, MEMORY_NAME, STARTUP_NAME
 from .db import Database, default_data_dir
 from .devices import DeviceWeb
-from .modes import ModeManager
+from .modes import MODES, ModeManager
+from .setup import SetupStore
 from .system_control import SystemControl
 
 
@@ -33,7 +34,7 @@ class WebAssembly:
 
     Web Assembly is deliberately a user-session coordinator. It prepares private
     runtime state, verifies Spider Core dependencies, snapshots hardware and update
-    state, and records enough information for the UI/Webbie to explain what is ready.
+    state, and records enough information for The Web/Webbie to explain what is ready.
     It does not silently change firmware, partitions, networking, or system images.
     """
 
@@ -65,17 +66,19 @@ class WebAssembly:
         db = Database(self.data_dir)
         self._phase("Personal Knowledge Web", lambda: (db.initialize(), MEMORY_NAME)[1])
 
+        setup_store = SetupStore(self.data_dir)
+        setup = self._phase("Spider Setup", setup_store.read) or {"complete": False}
+
+        modes = ModeManager(self.data_dir)
+        active_mode = self._phase("Workspace mode", lambda: self._resolve_mode(modes, setup)) or {"mode": "default"}
+
         devices = DeviceWeb(self.data_dir)
         device_snapshot = self._phase("Device Web", devices.snapshot) or {}
 
         system = SystemControl()
         system_snapshot = self._phase("System state", system.snapshot) or {}
 
-        modes = ModeManager(self.data_dir)
-        active_mode = self._phase("Workspace mode", modes.current) or {"mode": "default"}
-
         network = self._phase("Network", self._network_state) or {"online": False}
-        setup = self._phase("Spider Setup", self._setup_state) or {"complete": False}
 
         payload: dict[str, Any] = {
             "name": STARTUP_NAME,
@@ -93,6 +96,17 @@ class WebAssembly:
         self._write(payload)
         return payload
 
+    @staticmethod
+    def _resolve_mode(modes: ModeManager, setup: dict[str, Any]) -> dict[str, Any]:
+        # Preserve deliberate runtime changes. Only seed the mode from Setup when
+        # no mode state exists yet, including migration from older Spider builds.
+        if modes.path.exists():
+            return modes.current()
+        default_mode = str(setup.get("default_mode", "default"))
+        if bool(setup.get("complete")) and default_mode in MODES:
+            return modes.set(default_mode, actor="setup")
+        return modes.current()
+
     def _network_state(self) -> dict[str, Any]:
         result = {"online": False, "hostname": socket.gethostname()}
         try:
@@ -101,16 +115,6 @@ class WebAssembly:
         except OSError:
             pass
         return result
-
-    def _setup_state(self) -> dict[str, Any]:
-        path = self.data_dir / "setup.json"
-        if not path.exists():
-            return {"complete": False}
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return {"complete": False, "invalid": True}
-        return {"complete": bool(payload.get("complete")), "version": payload.get("version", 1)}
 
     def _write(self, payload: dict[str, Any]) -> None:
         tmp = self.state_path.with_suffix(".tmp")

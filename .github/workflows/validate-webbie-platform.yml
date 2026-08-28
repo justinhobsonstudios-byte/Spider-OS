@@ -47,7 +47,7 @@ jobs:
           tools/apply-source-overrides.sh "$GITHUB_WORKSPACE" "$project_root"
           echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
 
-      - name: Validate Python, shell, and The Web assets
+      - name: Validate Python, shell, The Web, and image services
         shell: bash
         run: |
           set -euo pipefail
@@ -55,15 +55,35 @@ jobs:
           while IFS= read -r script; do bash -n "$script"; done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
           bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-os-first-login"
           bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-webbie-resident"
+          bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-hardware-report"
+          grep -Fq 'exec /usr/bin/spider-os hardware' "$PROJECT_ROOT/system_files/usr/bin/spider-hardware-report"
           test -f "$PROJECT_ROOT/src/spider_os/web/platform.js"
           test -f "$PROJECT_ROOT/src/spider_os/web/platform.css"
+          test -f "$PROJECT_ROOT/src/spider_os/web/services.js"
+          test -f "$PROJECT_ROOT/src/spider_os/web/services.css"
           node --check "$PROJECT_ROOT/src/spider_os/web/app.js"
           node --check "$PROJECT_ROOT/src/spider_os/web/platform.js"
+          node --check "$PROJECT_ROOT/src/spider_os/web/services.js"
           grep -Fq 'id="platformStrip"' "$PROJECT_ROOT/src/spider_os/web/index.html"
           grep -Fq 'platform.css' "$PROJECT_ROOT/src/spider_os/web/index.html"
           grep -Fq 'platform.js' "$PROJECT_ROOT/src/spider_os/web/index.html"
+          grep -Fq 'services.css' "$PROJECT_ROOT/src/spider_os/web/index.html"
+          grep -Fq 'services.js' "$PROJECT_ROOT/src/spider_os/web/index.html"
           grep -Fq 'Name=The Web' "$PROJECT_ROOT/system_files/usr/share/applications/spider-os.desktop"
           grep -Fq 'Webbie resident intelligence' "$PROJECT_ROOT/system_files/usr/share/applications/spider-os.desktop"
+
+          voice_service="$PROJECT_ROOT/system_files/usr/lib/systemd/user/spider-webbie-voice.service"
+          test -f "$voice_service"
+          grep -Fq 'ExecStart=/usr/bin/spider-os voice listen' "$voice_service"
+          grep -Fq 'Restart=on-failure' "$voice_service"
+
+          build_script="$PROJECT_ROOT/build_files/build.sh"
+          grep -Fq 'python3-pocketsphinx' "$build_script"
+          grep -Fq 'pocketsphinx-models' "$build_script"
+          grep -Fq 'python3-sounddevice' "$build_script"
+          grep -Fq 'speech-dispatcher' "$build_script"
+          grep -Fq 'speech-dispatcher-espeak-ng' "$build_script"
+          grep -Fq 'systemctl --global enable spider-webbie-voice.service' "$build_script"
 
       - name: Run source tests
         shell: bash
@@ -73,7 +93,7 @@ jobs:
           cd "$PROJECT_ROOT"
           python3 -m pytest -q
 
-      - name: Exercise Web platform
+      - name: Exercise Web platform and Spider services
         shell: bash
         run: |
           set -euo pipefail
@@ -81,8 +101,15 @@ jobs:
           export SPIDER_OS_DATA_DIR="$RUNNER_TEMP/spider-data"
           python3 -m spider_os assembly > "$RUNNER_TEMP/assembly.json"
           python3 -m spider_os devices > "$RUNNER_TEMP/devices.json"
+          python3 -m spider_os hardware > "$RUNNER_TEMP/hardware.json"
           python3 -m spider_os mode studio > "$RUNNER_TEMP/mode.json"
           python3 -m spider_os system > "$RUNNER_TEMP/system.json"
+          python3 -m spider_os store status > "$RUNNER_TEMP/store.json"
+          python3 -m spider_os vault status > "$RUNNER_TEMP/vault.json"
+          python3 -m spider_os sync status > "$RUNNER_TEMP/sync.json"
+          python3 -m spider_os models route --sensitivity restricted --offline > "$RUNNER_TEMP/models.json"
+          python3 -m spider_os voice status > "$RUNNER_TEMP/voice.json"
+          python3 -m spider_os studio status > "$RUNNER_TEMP/studio.json"
           python3 - "$RUNNER_TEMP" <<'PY'
           import json
           import pathlib
@@ -92,16 +119,44 @@ jobs:
           load = lambda name: json.loads((root / name).read_text())
           assembly = load("assembly.json")
           devices = load("devices.json")
+          hardware = load("hardware.json")
           mode = load("mode.json")
           system = load("system.json")
+          store = load("store.json")
+          vault = load("vault.json")
+          sync = load("sync.json")
+          models = load("models.json")
+          voice = load("voice.json")
+          studio = load("studio.json")
 
           assert assembly["name"] == "Web Assembly", assembly
           assert assembly["resident_ai"] == "Webbie", assembly
           assert devices["name"] == "Device Web", devices
+          assert hardware["name"] == "Spider Hardware Validation", hardware
+          assert hardware["privacy"]["serial_numbers_collected"] is False, hardware
+          assert hardware["privacy"]["service_tags_collected"] is False, hardware
+          assert hardware["privacy"]["hardware_uuids_collected"] is False, hardware
+          assert hardware["privacy"]["mac_addresses_collected"] is False, hardware
+          assert hardware["image_guidance"]["default"] == "aurora-stable", hardware
           assert mode["mode"] == "studio", mode
           assert mode["address_name"] == "Justin", mode
           assert system["name"] == "Spider Control Center", system
           assert system["updates"]["default_channel"] == "stable", system
           assert system["recovery"]["atomic_rollback"] is True, system
-          print("Web platform integration contracts passed")
+          assert store["name"] == "Spider Store", store
+          assert vault["name"] == "Spider Vault", vault
+          assert sync["name"] == "Spider Sync", sync
+          assert sync["enabled"] is False, sync
+          assert sync["security"]["encryption_required"] is True, sync
+          assert sync["security"]["encryption_verified"] is False, sync
+          assert models["route"] in {"local", "unavailable"}, models
+          assert models["route"] != "cloud", models
+          assert voice["name"] == "Webbie Voice Runtime", voice
+          assert voice["policy"]["recognition"] == "local-only", voice
+          assert voice["policy"]["ambient_audio_stored"] is False, voice
+          assert voice["policy"]["non_addressed_speech_stored"] is False, voice
+          assert voice["voice_profile"]["requested_language"] == "en-AU", voice
+          assert studio["name"] == "Spider Studio", studio
+          assert studio["policy"]["base_distribution"] == "Aurora/Fedora", studio
+          print("Web platform, hardware, and Spider service contracts passed")
           PY

@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -eu
+
+# One privacy-safe hardware source for the CLI, The Web and support reports.
+# This intentionally omits serial numbers, service tags, UUIDs and MAC addresses.
+exec /usr/bin/spider-os hardware
