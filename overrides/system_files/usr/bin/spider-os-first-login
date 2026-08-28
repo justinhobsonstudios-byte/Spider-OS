@@ -2,8 +2,12 @@
 set -eu
 
 config_root="$HOME/.config/spider-os"
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/spider-os"
 marker="$config_root/desktop-initialized"
-mkdir -p "$config_root"
+setup_log="$state_root/setup.log"
+mkdir -p "$config_root" "$state_root"
+chmod 700 "$config_root" "$state_root" 2>/dev/null || true
+umask 077
 
 wallpaper=/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
 if [ ! -f "$marker" ]; then
@@ -16,9 +20,16 @@ if [ ! -f "$marker" ]; then
   : > "$marker"
 fi
 
-# First boot is not complete until Spider Setup has written its private marker.
-setup_state="${XDG_DATA_HOME:-$HOME/.local/share}/spider-os/setup.json"
-if [ ! -f "$setup_state" ]; then
-  # Do not block Plasma startup on the wizard.
-  (sleep 2; /usr/bin/spider-os setup) >/tmp/spider-setup.log 2>&1 &
+# First boot is not complete until Spider Setup reports complete=true. Merely
+# creating setup.json is not enough: an interrupted wizard must reopen on the
+# next login instead of silently stranding the user with half-written choices.
+setup_complete=0
+if /usr/bin/spider-os setup --status 2>/dev/null | grep -Eq '"complete"[[:space:]]*:[[:space:]]*true'; then
+  setup_complete=1
+fi
+
+if [ "$setup_complete" -ne 1 ]; then
+  # Do not block Plasma startup on the wizard. Keep logs in the user's private
+  # XDG state directory rather than a world-visible /tmp file.
+  (sleep 2; /usr/bin/spider-os setup) >"$setup_log" 2>&1 &
 fi
