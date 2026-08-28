@@ -14,6 +14,7 @@ from .constants import DEFAULT_HOST, DEFAULT_PORT
 from .db import Database
 from .devices import DeviceWeb
 from .modes import MODES, ModeManager
+from .platform import install_server_extensions
 from .resident import ResidentAgent
 from .server import run_server
 from .setup import SetupStore, run_setup
@@ -112,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
             _print(control.action_plan(args.action))
         return 0
     if command == "serve":
+        install_server_extensions()
         if getattr(args, "open", False):
             url = "http://" + args.host + ":" + str(args.port)
             threading.Timer(0.8, lambda: webbrowser.open(url)).start()
