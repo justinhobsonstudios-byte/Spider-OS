@@ -1,0 +1,184 @@
+---
+name: Build Spider OS ISO
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Containerfile'
+      - 'build-image.sh'
+      - 'build-iso.sh'
+      - 'build_files/**'
+      - 'system_files/**'
+      - 'src/**'
+      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
+      - '.github/workflows/build-spider-os-iso.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Containerfile'
+      - 'build-image.sh'
+      - 'build-iso.sh'
+      - 'build_files/**'
+      - 'system_files/**'
+      - 'src/**'
+      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
+      - '.github/workflows/build-spider-os-iso.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spider-os-iso-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-iso:
+    name: Build bootable installer
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+        with:
+          remove-codeql: true
+
+      - name: Ensure build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          command -v podman >/dev/null 2>&1 || missing=1
+          command -v unzip >/dev/null 2>&1 || missing=1
+          if [ "$missing" -eq 1 ]; then
+            sudo apt-get update
+            sudo apt-get install -y podman unzip
+          fi
+          podman --version
+          unzip -v | head -n 2
+
+      - name: Select Spider OS source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          project_root="$GITHUB_WORKSPACE"
+
+          if [ ! -d "$project_root/build_files" ] || \
+             [ ! -d "$project_root/system_files" ] || \
+             [ ! -d "$project_root/src/spider_os" ]; then
+            archive="$GITHUB_WORKSPACE/Spider_OS_v0.7_GitHub_ISO_Ready.zip"
+            if [ ! -f "$archive" ]; then
+              echo "Required source folders are missing and the ISO-ready source archive was not found." >&2
+              exit 1
+            fi
+
+            extract_root="$RUNNER_TEMP/spider-os-source"
+            rm -rf "$extract_root"
+            mkdir -p "$extract_root"
+            unzip -q "$archive" -d "$extract_root"
+
+            project_root=""
+            while IFS= read -r containerfile; do
+              candidate="$(dirname "$containerfile")"
+              if [ -d "$candidate/build_files" ] && \
+                 [ -d "$candidate/system_files" ] && \
+                 [ -d "$candidate/src/spider_os" ]; then
+                project_root="$candidate"
+                break
+              fi
+            done < <(find "$extract_root" -type f -name Containerfile -print)
+
+            if [ -z "$project_root" ]; then
+              echo "Could not find a complete Spider OS image-template tree inside the archive." >&2
+              find "$extract_root" -maxdepth 3 -type f -print | sort | head -n 200 >&2
+              exit 1
+            fi
+          fi
+
+          echo "Using Spider OS source tree: $project_root"
+          echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
+
+      - name: Validate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$PROJECT_ROOT/Containerfile"
+          test -d "$PROJECT_ROOT/build_files"
+          test -d "$PROJECT_ROOT/system_files"
+          test -d "$PROJECT_ROOT/src/spider_os"
+
+          while IFS= read -r script; do
+            bash -n "$script"
+          done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
+
+          python3 -m compileall -q "$PROJECT_ROOT/src/spider_os"
+
+      - name: Build Spider OS bootc image
+        shell: bash
+        env:
+          SPIDER_BASE_IMAGE: ghcr.io/ublue-os/aurora:stable
+        run: |
+          set -euo pipefail
+          sudo podman build \
+            --pull=newer \
+            --build-arg "BASE_IMAGE=$SPIDER_BASE_IMAGE" \
+            --file "$PROJECT_ROOT/Containerfile" \
+            --tag localhost/spider-os:latest \
+            "$PROJECT_ROOT"
+
+          sudo podman run --rm localhost/spider-os:latest bootc container lint
+
+      - name: Build installer ISO
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_dir="$GITHUB_WORKSPACE/output"
+          mkdir -p "$output_dir"
+
+          sudo podman run \
+            --rm \
+            --privileged \
+            --pull=newer \
+            --security-opt label=type:unconfined_t \
+            --volume "$output_dir:/output" \
+            --volume /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type anaconda-iso \
+            --rootfs btrfs \
+            --chown "$(id -u):$(id -g)" \
+            localhost/spider-os:latest
+
+      - name: Prepare ISO artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          iso_path="$(find "$GITHUB_WORKSPACE/output" -type f -name '*.iso' -print -quit)"
+          if [ -z "$iso_path" ]; then
+            echo "bootc-image-builder completed without producing an ISO." >&2
+            find "$GITHUB_WORKSPACE/output" -maxdepth 4 -type f -print >&2 || true
+            exit 1
+          fi
+
+          cp "$iso_path" "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
+          cd "$GITHUB_WORKSPACE"
+          sha256sum Spider_OS_x86_64.iso > Spider_OS_x86_64.iso.sha256
+          ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
+
+      - name: Upload Spider OS ISO
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Spider-OS-ISO
+          path: |
+            Spider_OS_x86_64.iso
+            Spider_OS_x86_64.iso.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
