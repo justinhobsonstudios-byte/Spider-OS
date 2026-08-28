@@ -22,6 +22,7 @@ chmod 0755 \
   /usr/bin/spider-os \
   /usr/bin/spider-os-open \
   /usr/bin/spider-os-first-login \
+  /usr/bin/spider-webbie-resident \
   /usr/bin/spider-hardware-report \
   /usr/bin/spider-security-lab
 
