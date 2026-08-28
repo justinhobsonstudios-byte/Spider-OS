@@ -44,7 +44,7 @@ jobs:
   build-iso:
     name: Build bootable installer
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for command in podman unzip xorriso cpio xz; do
+          for command in podman unzip xorriso cpio xz qemu-system-x86_64 qemu-img socat convert ssh ssh-keygen openssl; do
             command -v "$command" >/dev/null 2>&1 || missing=1
           done
           if [ "$missing" -eq 1 ]; then
@@ -65,7 +65,13 @@ jobs:
               unzip \
               xorriso \
               cpio \
-              xz-utils
+              xz-utils \
+              qemu-system-x86 \
+              qemu-utils \
+              socat \
+              imagemagick \
+              openssh-client \
+              openssl
           fi
           podman --version
           xorriso -version | head -n 1
@@ -113,10 +119,12 @@ jobs:
           test -f "$GITHUB_WORKSPACE/Containerfile"
           test -f "$GITHUB_WORKSPACE/disk_config/iso-kde.toml"
           test -f "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
+          test -f "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
           test -d "$PROJECT_ROOT/build_files"
           test -d "$PROJECT_ROOT/system_files"
           test -d "$PROJECT_ROOT/src/spider_os"
           bash -n "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
+          bash -n "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
@@ -197,6 +205,31 @@ jobs:
           "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh" \
             "$iso_path" \
             "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
+
+      - name: Install, reboot, and verify Web Assembly
+        shell: bash
+        timeout-minutes: 130
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/iso-e2e-evidence"
+          mkdir -p "$evidence"
+          chmod +x "$GITHUB_WORKSPACE/tools/inspect-installer-boot.sh"
+          chmod +x "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
+          "$GITHUB_WORKSPACE/tools/inspect-installer-boot.sh" \
+            "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso" \
+            "$evidence/boot-diagnostics.txt"
+          "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh" \
+            "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso" \
+            "$evidence"
+
+      - name: Upload full-install evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Spider-OS-Install-Test
+          path: iso-e2e-evidence/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Prepare ISO artifact
         shell: bash
