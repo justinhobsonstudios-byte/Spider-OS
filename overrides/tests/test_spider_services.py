@@ -93,6 +93,13 @@ class SpiderServicePolicyTests(unittest.TestCase):
         policy = VoiceRuntime.policy()
         self.assertEqual(policy["wake_detection"], "local-only")
         self.assertFalse(policy["ambient_audio_stored"])
+        self.assertFalse(policy["non_addressed_speech_stored"])
+
+    def test_voice_wake_phrase_extracts_only_addressed_commands(self) -> None:
+        self.assertEqual(VoiceRuntime._command_after_wake("hey webbie open studio"), "open studio")
+        self.assertEqual(VoiceRuntime._command_after_wake("Webbie"), "")
+        self.assertEqual(VoiceRuntime._command_after_wake("web show my anchors"), "show my anchors")
+        self.assertIsNone(VoiceRuntime._command_after_wake("the web is open"))
 
     def test_studio_low_latency_changes_need_approval(self) -> None:
         plan = SpiderStudio.action_plan("low-latency-profile")
