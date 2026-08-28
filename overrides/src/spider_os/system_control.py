@@ -5,6 +5,8 @@ import shutil
 import subprocess
 from typing import Any
 
+from .privileged import PrivilegedExecutor
+
 
 def _run(command: list[str], timeout: float = 4.0) -> tuple[int, str, str]:
     if not shutil.which(command[0]):
@@ -17,10 +19,11 @@ def _run(command: list[str], timeout: float = 4.0) -> tuple[int, str, str]:
 
 
 class SystemControl:
-    """Read-mostly system/recovery/update backend for Spider Control Center.
+    """Read system state and route approved mutations through Polkit.
 
-    Mutating operations are intentionally returned as approval plans. Webbie or the
-    UI can present them to the Action Broker instead of getting a magical root shell.
+    The Web and Webbie never receive a root shell. A plan is still generated first;
+    execution is a separate operation and crosses the privilege boundary through the
+    fixed-command Spider OS helper, where Polkit performs human authentication.
     """
 
     def snapshot(self) -> dict[str, Any]:
@@ -30,6 +33,7 @@ class SystemControl:
             "flatpak": self.flatpak_status(),
             "recovery": self.recovery_capabilities(),
             "updates": self.update_capabilities(),
+            "privileged_broker": PrivilegedExecutor.status(),
         }
 
     def deployment_status(self) -> dict[str, Any]:
@@ -78,10 +82,39 @@ class SystemControl:
     @staticmethod
     def action_plan(action: str) -> dict[str, Any]:
         plans = {
-            "update": {"tier": "sensitive", "reversible": True, "command": ["bootc", "upgrade"]},
-            "rollback": {"tier": "critical", "reversible": True, "command": ["bootc", "rollback"]},
-            "reboot": {"tier": "sensitive", "reversible": False, "command": ["systemctl", "reboot"]},
+            "update": {
+                "tier": "sensitive",
+                "reversible": True,
+                "command": ["bootc", "upgrade"],
+                "effect": "stage-update",
+            },
+            "rollback": {
+                "tier": "critical",
+                "reversible": True,
+                "command": ["bootc", "rollback"],
+                "effect": "select-previous-deployment",
+            },
+            "reboot": {
+                "tier": "sensitive",
+                "reversible": False,
+                "command": ["systemctl", "reboot"],
+                "effect": "restart-system",
+            },
         }
         if action not in plans:
             raise ValueError(f"unknown system action: {action}")
-        return {"action": action, "requires_approval": True, **plans[action]}
+        return {
+            "action": action,
+            "requires_approval": True,
+            "executes": False,
+            "authorization": "polkit-admin-at-execution",
+            "arbitrary_shell": False,
+            **plans[action],
+        }
+
+    @staticmethod
+    def execute(action: str) -> dict[str, Any]:
+        # Validate through the same public plan contract before crossing into the
+        # privileged executor. The executor performs its own whitelist validation too.
+        SystemControl.action_plan(action)
+        return PrivilegedExecutor.execute(action)
