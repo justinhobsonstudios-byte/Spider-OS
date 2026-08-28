@@ -32,6 +32,25 @@ class DeviceWeb:
         self.runtime_dir = self.data_dir / "runtime"
         self.path = self.runtime_dir / "device-web.json"
 
+    def current(self) -> dict[str, Any]:
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                return payload
+        except (OSError, json.JSONDecodeError):
+            pass
+        return {
+            "name": "Device Web",
+            "captured_at": None,
+            "pci": [],
+            "usb": [],
+            "network": [],
+            "audio": {"pipewire": False, "default": "", "sinks": [], "sources": []},
+            "bluetooth": {"available": False, "controllers": [], "devices": []},
+            "displays": [],
+            "storage": [],
+        }
+
     def snapshot(self) -> dict[str, Any]:
         self.runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         payload = {
