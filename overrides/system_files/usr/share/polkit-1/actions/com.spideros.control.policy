@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
+<policyconfig>
+  <vendor>Spider OS</vendor>
+  <vendor_url>https://github.com/justinhobsonstudios-byte/Spider-OS</vendor_url>
+  <icon_name>spider-os</icon_name>
+
+  <action id="com.spideros.control.update">
+    <description>Update Spider OS</description>
+    <message>Authentication is required to stage a Spider OS system update.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/spider-os-privileged-control</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">update</annotate>
+  </action>
+
+  <action id="com.spideros.control.rollback">
+    <description>Roll back Spider OS</description>
+    <message>Authentication is required to select the previous Spider OS deployment.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/spider-os-privileged-control</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">rollback</annotate>
+  </action>
+
+  <action id="com.spideros.control.reboot">
+    <description>Restart Spider OS</description>
+    <message>Authentication is required to restart Spider OS.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/spider-os-privileged-control</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">reboot</annotate>
+  </action>
+</policyconfig>
