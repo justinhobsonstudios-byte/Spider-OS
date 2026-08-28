@@ -64,7 +64,7 @@ jobs:
           cd "$PROJECT_ROOT"
           python3 -m pytest -q
 
-      - name: Exercise Web Assembly
+      - name: Exercise Web platform
         shell: bash
         run: |
           set -euo pipefail
@@ -74,7 +74,25 @@ jobs:
           python3 -m spider_os.cli devices > "$RUNNER_TEMP/devices.json"
           python3 -m spider_os.cli mode studio > "$RUNNER_TEMP/mode.json"
           python3 -m spider_os.cli system > "$RUNNER_TEMP/system.json"
-          grep -q 'Web Assembly' "$RUNNER_TEMP/assembly.json"
-          grep -q 'studio' "$RUNNER_TEMP/mode.json"
-          grep -q 'Device Web' "$RUNNER_TEMP/devices.json"
-          grep -q 'Spider Control Center' "$RUNNER_TEMP/system.json"
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          load = lambda name: json.loads((root / name).read_text())
+          assembly = load("assembly.json")
+          devices = load("devices.json")
+          mode = load("mode.json")
+          system = load("system.json")
+
+          assert assembly["name"] == "Web Assembly", assembly
+          assert assembly["resident_ai"] == "Webbie", assembly
+          assert devices["name"] == "Device Web", devices
+          assert mode["mode"] == "studio", mode
+          assert mode["address_name"] == "Justin", mode
+          assert system["name"] == "Spider Control Center", system
+          assert system["updates"]["default_channel"] == "stable", system
+          assert system["recovery"]["atomic_rollback"] is True, system
+          print("Web platform integration contracts passed")
+          PY
