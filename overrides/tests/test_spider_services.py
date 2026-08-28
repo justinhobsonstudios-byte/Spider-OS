@@ -10,8 +10,10 @@ from pathlib import Path
 
 from spider_os.db import Database
 from spider_os.model_router import ModelRouter
+from spider_os.modes import ModeManager
 from spider_os.platform import install_server_extensions
 from spider_os.server import create_server
+from spider_os.setup import SetupStore
 from spider_os.store import SpiderStore
 from spider_os.studio import SpiderStudio
 from spider_os.sync import SpiderSync
@@ -61,6 +63,27 @@ class SpiderServicePolicyTests(unittest.TestCase):
                     provider="webdav",
                     endpoint="http://example.test/dav",
                 )
+
+    def test_setup_applies_selected_default_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            data_dir = Path(root)
+            saved = SetupStore(data_dir).write(
+                {
+                    "default_mode": "studio",
+                    "authority": "graduated",
+                    "voice_enabled": True,
+                    "screen_awareness": True,
+                    "learn_user": True,
+                    "learn_studies": True,
+                    "learn_internet": True,
+                    "proactive_level": "very-high",
+                }
+            )
+            self.assertEqual(saved["active_mode"], "studio")
+            active = ModeManager(data_dir).current()
+            self.assertEqual(active["mode"], "studio")
+            self.assertEqual(active["address_name"], "Justin")
+            self.assertEqual(active["actor"], "setup")
 
     def test_model_router_keeps_restricted_context_local(self) -> None:
         self.assertEqual(ModelRouter.policy()["restricted"], "local-only")
