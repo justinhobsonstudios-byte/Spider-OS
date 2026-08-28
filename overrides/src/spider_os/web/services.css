@@ -1,0 +1,139 @@
+.spider-services-button {
+  border-color: rgba(82, 198, 154, 0.2);
+  color: #c7eadc;
+  background: rgba(82, 198, 154, 0.05);
+}
+
+.spider-services-dialog {
+  width: min(1040px, calc(100vw - 28px));
+  max-height: min(860px, calc(100vh - 28px));
+  overflow-y: auto;
+}
+
+.spider-services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.spider-service-card,
+.spider-service-panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.spider-service-card {
+  padding: 15px;
+}
+
+.spider-service-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.spider-service-heading h3,
+.spider-service-panel h3 {
+  margin: 0;
+}
+
+.spider-service-heading span {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.spider-service-panel {
+  margin-top: 14px;
+  padding: 17px;
+}
+
+.spider-service-panel > p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.spider-service-form {
+  display: flex;
+  gap: 8px;
+}
+
+.spider-service-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #0a0b0d;
+  padding: 10px 12px;
+}
+
+.spider-service-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.spider-service-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .018);
+}
+
+.spider-service-result > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.spider-service-result span {
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.spider-service-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.spider-service-inline {
+  display: block;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(232, 181, 99, .22);
+  border-radius: 8px;
+  background: rgba(232, 181, 99, .055);
+  color: #ded4c1;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .spider-services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .spider-services-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spider-service-form,
+  .spider-service-result {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
