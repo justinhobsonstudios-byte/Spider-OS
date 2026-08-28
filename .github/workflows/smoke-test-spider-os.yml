@@ -95,15 +95,17 @@ jobs:
           serial="$GITHUB_WORKSPACE/iso/serial.log"
           qemu-img create -f qcow2 "$disk" 32G
 
-          accel='tcg,thread=multi'
+          accel_args=(-accel 'tcg,thread=multi' -cpu max)
+          accel_name='tcg,thread=multi'
           if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
-            accel='kvm'
+            accel_args=(-accel kvm -cpu host)
+            accel_name='kvm'
           fi
-          echo "Using QEMU acceleration: $accel"
+          echo "Using QEMU acceleration: $accel_name"
 
           qemu-system-x86_64 \
-            -machine "q35,accel=$accel" \
-            -cpu max \
+            -machine q35 \
+            "${accel_args[@]}" \
             -m 4096 \
             -smp 2 \
             -boot order=d \
@@ -131,8 +133,10 @@ jobs:
             printf 'quit\n' | socat - "UNIX-CONNECT:$monitor" || true
           fi
 
+          found=0
           for ppm in "$GITHUB_WORKSPACE"/iso/spider-boot-*.ppm; do
-            test -f "$ppm"
+            [ -f "$ppm" ] || continue
+            found=1
             png="${ppm%.ppm}.png"
             convert "$ppm" "$png"
             identify "$png"
@@ -144,17 +148,18 @@ jobs:
             fi
             rm -f "$ppm"
           done
+          test "$found" -eq 1
 
           echo "Spider OS produced a non-blank virtual display while booted from the generated ISO."
 
       - name: Upload boot-test evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-Boot-Test
           path: |
-            iso/spider-boot-30s.png
-            iso/spider-boot-90s.png
+            iso/spider-boot-*.png
             iso/serial.log
             iso/qemu-status.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
