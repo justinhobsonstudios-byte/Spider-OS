@@ -190,13 +190,21 @@ while kill -0 "$install_pid" >/dev/null 2>&1; do
 done
 install_pid=""
 
-grep -Fq 'Install finished' "$install_serial" || {
-  echo "Anaconda rebooted without emitting the bootc install completion marker." >&2
+# Anaconda 44 no longer guarantees the historical literal "Install finished"
+# on ttyS0. Treat serial output as a fatal-error/lifecycle signal, then let the
+# installed-disk boot, SSH login, and Web Assembly checks prove installation.
+grep -Eq 'anaconda .* started\.' "$install_serial" || {
+  echo "Anaconda never reached its installer runtime." >&2
   exit 1
 }
 if grep -Eqi 'installation failed|kickstart.*(error|failed)|traceback|kernel panic|dracut.*emergency' "$install_serial"; then
   echo "Fatal installer condition found in serial output." >&2
   exit 1
+fi
+if grep -Fq 'reboot: Restarting system' "$install_serial"; then
+  echo "Anaconda requested a reboot; verifying the installed disk next."
+else
+  echo "Installer VM exited without a serial reboot marker; verifying the installed disk rather than trusting a version-specific console phrase."
 fi
 
 qemu-img info "$disk" | tee "$evidence/installed-disk.txt"
