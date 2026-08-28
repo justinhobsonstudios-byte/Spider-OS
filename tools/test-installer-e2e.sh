@@ -91,7 +91,7 @@ mkdir -p "$kickstart_root"
 cat > "$kickstart_root/spider-ci.ks" <<KICKSTART
 %include /run/install/repo/osbuild-base.ks
 
-graphical
+text --non-interactive
 firewall --enabled --service=ssh
 services --enabled=NetworkManager,sshd,sddm
 
