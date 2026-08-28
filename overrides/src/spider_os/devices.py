@@ -35,6 +35,7 @@ class DeviceWeb:
     def snapshot(self) -> dict[str, Any]:
         self.runtime_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         payload = {
+            "name": "Device Web",
             "captured_at": utc_now(),
             "pci": self._lines(_run(["lspci", "-mm"])),
             "usb": self._lines(_run(["lsusb"])),
