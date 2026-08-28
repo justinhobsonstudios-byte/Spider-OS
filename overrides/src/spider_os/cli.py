@@ -88,7 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     studio = subparsers.add_parser("studio", help="inspect Spider Studio or create a session plan")
     studio.add_argument("operation", choices=["status", "plan"], nargs="?", default="status")
     studio.add_argument("--action", choices=["open-app", "low-latency-profile"], default="low-latency-profile")
-    studio.add_argument("--command")
+    studio.add_argument("--command", dest="studio_command")
     return parser
 
 
@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         _print(
             studio.status()
             if args.operation == "status"
-            else studio.action_plan(args.action, args.command)
+            else studio.action_plan(args.action, args.studio_command)
         )
         return 0
     if command == "serve":
