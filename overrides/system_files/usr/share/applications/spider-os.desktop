@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=The Web
+GenericName=Spider OS Desktop
+Comment=Spider OS whole-life desktop with Webbie resident intelligence
+Exec=spider-os-open
+Icon=spider-os
+Terminal=false
+Categories=Utility;Office;
+StartupNotify=true
+Keywords=Webbie;AI;Threads;Anchors;Life;School;Music;Studio;Kali Bay;
