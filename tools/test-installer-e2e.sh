@@ -93,7 +93,10 @@ cat > "$kickstart_root/spider-ci.ks" <<KICKSTART
 
 text --non-interactive
 firewall --enabled --service=ssh
-services --enabled=NetworkManager,sshd,sddm
+# NetworkManager and SSH are needed for CI verification. Do not ask Anaconda
+# to enable SDDM here: Aurora owns the display-manager enablement in the image,
+# and Anaconda 44 rejects the redundant service operation for this bootc deploy.
+services --enabled=NetworkManager,sshd
 
 user --name=spiderci --groups=wheel --password='${password_hash}' --iscrypted
 sshkey --username=spiderci "${ssh_public_key}"
@@ -197,7 +200,7 @@ grep -Eq 'anaconda .* started\.' "$install_serial" || {
   echo "Anaconda never reached its installer runtime." >&2
   exit 1
 }
-if grep -Eqi 'installation failed|kickstart.*(error|failed)|traceback|kernel panic|dracut.*emergency' "$install_serial"; then
+if grep -Eqi 'installation failed|kickstart.*(error|failed)|error enabling service|installer will now terminate|traceback|kernel panic|dracut.*emergency' "$install_serial"; then
   echo "Fatal installer condition found in serial output." >&2
   exit 1
 fi
