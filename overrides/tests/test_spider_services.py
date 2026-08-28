@@ -33,13 +33,14 @@ class SpiderServicePolicyTests(unittest.TestCase):
         self.assertFalse(policy["secret_values_in_logs"])
         self.assertFalse(policy["secret_values_in_platform_api"])
 
-    def test_sync_is_encrypted_and_off_by_default(self) -> None:
+    def test_sync_is_off_by_default_and_does_not_fake_encryption(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             sync = SpiderSync(Path(root))
             status = sync.status()
             self.assertFalse(status["enabled"])
             self.assertEqual(status["provider"], "none")
-            self.assertTrue(status["encrypted"])
+            self.assertTrue(status["security"]["encryption_required"])
+            self.assertFalse(status["security"]["encryption_verified"])
             changed = sync.configure(
                 enabled=True,
                 provider="local-folder",
@@ -47,6 +48,19 @@ class SpiderServicePolicyTests(unittest.TestCase):
             )
             self.assertTrue(changed["enabled"])
             self.assertEqual(changed["credentials"], "Spider Vault")
+            plan = sync.action_plan("sync-now")
+            self.assertFalse(plan["ready"])
+            self.assertFalse(plan["security"]["encryption_verified"])
+
+    def test_webdav_rejects_plain_http(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            sync = SpiderSync(Path(root))
+            with self.assertRaises(ValueError):
+                sync.configure(
+                    enabled=True,
+                    provider="webdav",
+                    endpoint="http://example.test/dav",
+                )
 
     def test_model_router_keeps_restricted_context_local(self) -> None:
         self.assertEqual(ModelRouter.policy()["restricted"], "local-only")
@@ -120,7 +134,7 @@ class SpiderServiceApiTests(unittest.TestCase):
         self.assertTrue(result["requires_approval"])
         self.assertFalse(result["executes"])
 
-    def test_sync_configuration_endpoint_keeps_encryption_required(self) -> None:
+    def test_sync_configuration_endpoint_requires_verified_encryption(self) -> None:
         token = self.get_json("/api/bootstrap")["csrf_token"]
         result = self.post_json(
             "/api/sync/configure",
@@ -128,7 +142,8 @@ class SpiderServiceApiTests(unittest.TestCase):
             token,
         )["sync"]
         self.assertFalse(result["enabled"])
-        self.assertTrue(result["encrypted"])
+        self.assertTrue(result["security"]["encryption_required"])
+        self.assertFalse(result["security"]["encryption_verified"])
         self.assertEqual(result["credentials"], "Spider Vault")
 
 
