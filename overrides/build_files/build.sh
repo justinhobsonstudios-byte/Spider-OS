@@ -16,7 +16,12 @@ dnf5 install -y \
   podman \
   python3 \
   pciutils \
-  usbutils
+  usbutils \
+  python3-pocketsphinx \
+  pocketsphinx-models \
+  python3-sounddevice \
+  speech-dispatcher \
+  speech-dispatcher-espeak-ng
 
 chmod 0755 \
   /usr/bin/spider-os \
@@ -29,5 +34,6 @@ chmod 0755 \
 systemctl --global enable spider-os.service
 systemctl --global enable spider-web-assembly.service
 systemctl --global enable spider-ai-resident.service
+systemctl --global enable spider-webbie-voice.service
 
 dnf5 clean all
