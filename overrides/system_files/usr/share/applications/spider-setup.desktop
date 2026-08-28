@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Spider Setup
+Comment=Configure Webbie, privacy, and Web Assembly
+Exec=spider-os setup
+Icon=spider-os
+Terminal=false
+Categories=Settings;System;
+StartupNotify=true
