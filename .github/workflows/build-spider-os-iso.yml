@@ -124,6 +124,28 @@ jobs:
           echo "Disk space after cleanup:"
           df -h /
 
+      - name: Pull bootc image builder
+        shell: bash
+        env:
+          BIB_IMAGE: quay.io/centos-bootc/bootc-image-builder:latest
+        run: |
+          set -euo pipefail
+          pulled=false
+          for attempt in 1 2 3 4; do
+            echo "Pulling bootc-image-builder (attempt $attempt of 4)..."
+            if sudo podman pull "$BIB_IMAGE"; then
+              pulled=true
+              break
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              sleep $((attempt * 10))
+            fi
+          done
+          if [ "$pulled" != true ]; then
+            echo "Unable to download bootc-image-builder after 4 attempts." >&2
+            exit 1
+          fi
+
       - name: Build Spider OS bootc image
         shell: bash
         env:
@@ -140,6 +162,8 @@ jobs:
 
       - name: Build installer ISO
         shell: bash
+        env:
+          BIB_IMAGE: quay.io/centos-bootc/bootc-image-builder:latest
         run: |
           set -euo pipefail
           output_dir="$GITHUB_WORKSPACE/output"
@@ -147,11 +171,11 @@ jobs:
           sudo podman run \
             --rm \
             --privileged \
-            --pull=newer \
+            --pull=never \
             --security-opt label=type:unconfined_t \
             --volume "$output_dir:/output" \
             --volume /var/lib/containers/storage:/var/lib/containers/storage \
-            quay.io/centos-bootc/bootc-image-builder:latest \
+            "$BIB_IMAGE" \
             --type anaconda-iso \
             --rootfs btrfs \
             --chown "$(id -u):$(id -g)" \
