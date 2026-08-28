@@ -45,11 +45,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Maximize build space
-        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
-        with:
-          remove-codeql: true
-
       - name: Ensure build tools
         shell: bash
         run: |
@@ -120,6 +115,11 @@ jobs:
           done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
 
           python3 -m compileall -q "$PROJECT_ROOT/src/spider_os"
+
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+        with:
+          remove-codeql: true
 
       - name: Build Spider OS bootc image
         shell: bash
