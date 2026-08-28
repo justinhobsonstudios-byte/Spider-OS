@@ -83,7 +83,10 @@ def build_parser() -> argparse.ArgumentParser:
     models.add_argument("--allow-cloud", action="store_true")
     models.add_argument("--offline", action="store_true")
 
-    subparsers.add_parser("voice", help="inspect Webbie voice runtime")
+    voice = subparsers.add_parser("voice", help="inspect or run Webbie's local voice presence")
+    voice.add_argument("operation", choices=["status", "listen", "say"], nargs="?", default="status")
+    voice.add_argument("text", nargs="*")
+    voice.add_argument("--interval", type=float, default=5.0)
 
     studio = subparsers.add_parser("studio", help="inspect Spider Studio or create a session plan")
     studio.add_argument("operation", choices=["status", "plan"], nargs="?", default="status")
@@ -199,7 +202,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     if command == "voice":
-        _print(VoiceRuntime().status())
+        runtime = VoiceRuntime()
+        if args.operation == "status":
+            _print(runtime.status())
+        elif args.operation == "say":
+            text = " ".join(args.text).strip()
+            if not text:
+                raise SystemExit("voice say requires text")
+            _print(runtime.speak(text))
+        else:
+            runtime.listen_forever(interval=max(2.0, args.interval))
         return 0
     if command == "studio":
         studio = SpiderStudio()
