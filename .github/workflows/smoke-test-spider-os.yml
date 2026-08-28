@@ -1,0 +1,160 @@
+---
+name: Smoke Test Spider OS ISO
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/smoke-test-spider-os.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  boot-test:
+    name: Boot Spider OS ISO in QEMU
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Before cleanup:"
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          echo "After cleanup:"
+          df -h /
+
+      - name: Install VM tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-x86 \
+            qemu-utils \
+            socat \
+            imagemagick \
+            xorriso \
+            unzip
+          qemu-system-x86_64 --version
+
+      - name: Download completed Spider OS ISO artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_ID: '9674019935'
+          ARTIFACT_SHA256: '49f51632412151e8d648e40af0b51b668cfc5ea4ce173cbc575a272d29aed31a'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/Spider-OS-ISO.zip"
+          mkdir -p "$GITHUB_WORKSPACE/iso"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            --output "$archive"
+          echo "$ARTIFACT_SHA256  $archive" | sha256sum --check
+          unzip -q "$archive" -d "$GITHUB_WORKSPACE/iso"
+          rm -f "$archive"
+          iso_path="$(find "$GITHUB_WORKSPACE/iso" -type f -name '*.iso' -print -quit)"
+          if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
+            echo "No ISO found in artifact." >&2
+            exit 1
+          fi
+          echo "ISO_PATH=$iso_path" >> "$GITHUB_ENV"
+          ls -lh "$iso_path"
+          sha256sum "$iso_path"
+          df -h /
+
+      - name: Verify ISO boot catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          xorriso -indev "$ISO_PATH" -report_el_torito plain | tee "$RUNNER_TEMP/el-torito.txt"
+          grep -Eiq 'El Torito|boot' "$RUNNER_TEMP/el-torito.txt"
+
+      - name: Boot ISO and capture virtual display
+        shell: bash
+        run: |
+          set -euo pipefail
+          disk="$RUNNER_TEMP/spider-test.qcow2"
+          monitor="$RUNNER_TEMP/qemu-monitor.sock"
+          serial="$GITHUB_WORKSPACE/iso/serial.log"
+          qemu-img create -f qcow2 "$disk" 32G
+
+          accel='tcg,thread=multi'
+          if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            accel='kvm'
+          fi
+          echo "Using QEMU acceleration: $accel"
+
+          qemu-system-x86_64 \
+            -machine "q35,accel=$accel" \
+            -cpu max \
+            -m 4096 \
+            -smp 2 \
+            -boot order=d \
+            -cdrom "$ISO_PATH" \
+            -drive "file=$disk,format=qcow2,if=virtio" \
+            -display none \
+            -monitor "unix:$monitor,server=on,wait=off" \
+            -serial "file:$serial" \
+            -no-reboot \
+            -daemonize
+
+          for i in $(seq 1 30); do
+            [ -S "$monitor" ] && break
+            sleep 1
+          done
+          test -S "$monitor"
+
+          sleep 30
+          printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-30s.ppm" | socat - "UNIX-CONNECT:$monitor"
+
+          sleep 60
+          if [ -S "$monitor" ]; then
+            printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-90s.ppm" | socat - "UNIX-CONNECT:$monitor"
+            printf 'info status\n' | socat - "UNIX-CONNECT:$monitor" | tee "$GITHUB_WORKSPACE/iso/qemu-status.txt"
+            printf 'quit\n' | socat - "UNIX-CONNECT:$monitor" || true
+          fi
+
+          for ppm in "$GITHUB_WORKSPACE"/iso/spider-boot-*.ppm; do
+            test -f "$ppm"
+            png="${ppm%.ppm}.png"
+            convert "$ppm" "$png"
+            identify "$png"
+            colors="$(convert "$png" -format '%k' info:)"
+            echo "$(basename "$png"): $colors colors"
+            if [ "$colors" -le 1 ]; then
+              echo "Captured VM screen is blank/monochrome: $png" >&2
+              exit 1
+            fi
+            rm -f "$ppm"
+          done
+
+          echo "Spider OS produced a non-blank virtual display while booted from the generated ISO."
+
+      - name: Upload boot-test evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Spider-OS-Boot-Test
+          path: |
+            iso/spider-boot-30s.png
+            iso/spider-boot-90s.png
+            iso/serial.log
+            iso/qemu-status.txt
+          if-no-files-found: error
+          retention-days: 14
