@@ -1,14 +1,15 @@
 # Spider OS bootc image
 # Structural reference: Universal Blue image-template
 
+ARG BASE_IMAGE=ghcr.io/ublue-os/aurora:stable
+
 FROM scratch AS ctx
 
 COPY build_files /
 COPY system_files /system_files
 COPY src/spider_os /spider_os
 
-ARG BASE_IMAGE=ghcr.io/ublue-os/aurora:stable
-FROM $BASE_IMAGE
+FROM ${BASE_IMAGE}
 
 LABEL containers.bootc="1"
 LABEL org.opencontainers.image.title="Spider OS"
