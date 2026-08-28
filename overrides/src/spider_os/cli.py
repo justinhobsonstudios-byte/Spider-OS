@@ -61,9 +61,9 @@ def build_parser() -> argparse.ArgumentParser:
     system.add_argument("operation", choices=["status", "plan", "execute"], nargs="?", default="status")
     system.add_argument("action", choices=["update", "rollback", "reboot"], nargs="?")
 
-    store = subparsers.add_parser("store", help="inspect Spider Store or create an app action plan")
-    store.add_argument("operation", choices=["status", "search", "plan"], nargs="?", default="status")
-    store.add_argument("value", nargs="?", help="search text or application id")
+    store = subparsers.add_parser("store", help="inspect or operate Spider Store")
+    store.add_argument("operation", choices=["status", "search", "plan", "execute"], nargs="?", default="status")
+    store.add_argument("value", nargs="?", help="search text or Flatpak application id")
     store.add_argument("--action", choices=["install", "remove", "update"])
     store.add_argument("--remote", default="flathub")
 
@@ -176,8 +176,11 @@ def main(argv: list[str] | None = None) -> int:
             _print(store.search(args.value))
         else:
             if not args.action or not args.value:
-                raise SystemExit("store plan requires --action and an application id")
-            _print(store.action_plan(args.action, args.value, args.remote))
+                raise SystemExit("store plan/execute requires --action and an application id")
+            if args.operation == "execute":
+                _print(store.execute(args.action, args.value, args.remote))
+            else:
+                _print(store.action_plan(args.action, args.value, args.remote))
         return 0
     if command == "vault":
         vault = SpiderVault()
