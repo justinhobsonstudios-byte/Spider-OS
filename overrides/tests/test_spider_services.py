@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from spider_os.db import Database
+from spider_os.hardware import HardwareValidator, SENSITIVE_DMI_FIELDS
 from spider_os.model_router import ModelRouter
 from spider_os.modes import ModeManager
 from spider_os.platform import install_server_extensions
@@ -101,6 +102,16 @@ class SpiderServicePolicyTests(unittest.TestCase):
         self.assertEqual(VoiceRuntime._command_after_wake("web show my anchors"), "show my anchors")
         self.assertIsNone(VoiceRuntime._command_after_wake("the web is open"))
 
+    def test_hardware_validation_excludes_sensitive_dmi_identifiers(self) -> None:
+        report = HardwareValidator().snapshot()
+        self.assertEqual(report["name"], "Spider Hardware Validation")
+        self.assertTrue(set(report["identity"]).isdisjoint(SENSITIVE_DMI_FIELDS))
+        self.assertFalse(report["privacy"]["serial_numbers_collected"])
+        self.assertFalse(report["privacy"]["service_tags_collected"])
+        self.assertFalse(report["privacy"]["hardware_uuids_collected"])
+        self.assertFalse(report["privacy"]["mac_addresses_collected"])
+        self.assertEqual(report["image_guidance"]["default"], "aurora-stable")
+
     def test_studio_low_latency_changes_need_approval(self) -> None:
         plan = SpiderStudio.action_plan("low-latency-profile")
         self.assertTrue(plan["requires_approval"])
@@ -153,6 +164,9 @@ class SpiderServiceApiTests(unittest.TestCase):
         self.assertEqual(self.get_json("/api/voice")["voice"]["name"], "Webbie Voice Runtime")
         self.assertEqual(self.get_json("/api/studio")["studio"]["name"], "Spider Studio")
         self.assertEqual(self.get_json("/api/store")["store"]["name"], "Spider Store")
+        hardware = self.get_json("/api/hardware")["hardware"]
+        self.assertEqual(hardware["name"], "Spider Hardware Validation")
+        self.assertFalse(hardware["privacy"]["service_tags_collected"])
 
     def test_store_install_endpoint_returns_plan_only(self) -> None:
         token = self.get_json("/api/bootstrap")["csrf_token"]
