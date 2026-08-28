@@ -25,6 +25,7 @@ class SystemControl:
 
     def snapshot(self) -> dict[str, Any]:
         return {
+            "name": "Spider Control Center",
             "deployment": self.deployment_status(),
             "flatpak": self.flatpak_status(),
             "recovery": self.recovery_capabilities(),
