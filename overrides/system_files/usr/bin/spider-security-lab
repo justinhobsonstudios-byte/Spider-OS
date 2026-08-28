@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+container_name=spider-kali
+image_name=docker.io/kalilinux/kali-rolling
+
+usage() {
+  cat <<'EOF'
+Kali Bay · Spider OS isolated security workspace
+Usage: spider-security-lab setup [headless|default|large] [--net-raw]
+       spider-security-lab enter
+       spider-security-lab stop
+       spider-security-lab status
+       spider-security-lab reset
+
+Default setup adds no Linux capabilities, host folders, host networking, devices,
+or privileged execution. --net-raw is an explicit terminal-only opt-in for tools
+that genuinely require raw packet sockets.
+
+Use Kali Bay only on systems you own or are explicitly authorized to assess.
+EOF
+}
+
+require_rootless_podman() {
+  if ! command -v podman >/dev/null 2>&1; then
+    printf '%s\n' 'Podman is required but not installed.' >&2
+    exit 1
+  fi
+  if [ "$(id -u)" -eq 0 ]; then
+    printf '%s\n' 'Kali Bay refuses to run as root. Use the normal Spider OS user session.' >&2
+    exit 77
+  fi
+  local rootless
+  rootless="$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null || true)"
+  if [ "$rootless" != 'true' ]; then
+    printf '%s\n' 'Kali Bay requires rootless Podman.' >&2
+    exit 77
+  fi
+}
+
+container_exists() {
+  podman container exists "$container_name"
+}
+
+profile_package() {
+  case "$1" in
+    headless) printf '%s\n' 'kali-linux-headless' ;;
+    default) printf '%s\n' 'kali-linux-default' ;;
+    large) printf '%s\n' 'kali-linux-large' ;;
+    *) return 2 ;;
+  esac
+}
+
+confirm_net_raw() {
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    printf '%s\n' 'NET_RAW enablement requires an interactive terminal.' >&2
+    exit 77
+  fi
+  cat <<'EOF'
+NET_RAW allows raw packet sockets inside Kali Bay. It remains rootless and does
+not enable host networking, host folders, device passthrough, or --privileged.
+Only enable this for an authorized task that requires raw packets.
+EOF
+  printf '%s' 'Type ENABLE NET_RAW to continue: '
+  read -r answer
+  if [ "$answer" != 'ENABLE NET_RAW' ]; then
+    printf '%s\n' 'NET_RAW enablement canceled.' >&2
+    exit 1
+  fi
+}
+
+setup_lab() {
+  local profile=headless
+  local net_raw=false
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      headless|default|large) profile="$arg" ;;
+      --net-raw) net_raw=true ;;
+      *)
+        printf 'Unknown Kali Bay setup option: %s\n' "$arg" >&2
+        usage
+        exit 2
+        ;;
+    esac
+  done
+
+  if container_exists; then
+    printf '%s\n' 'Kali Bay already exists. Reset it before changing its isolation profile.'
+    exit 0
+  fi
+
+  local metapackage
+  metapackage="$(profile_package "$profile")"
+  if [ "$net_raw" = true ]; then
+    confirm_net_raw
+  fi
+
+  podman pull "$image_name"
+
+  local -a create_args=(
+    --name "$container_name"
+    --hostname kali-bay
+    --security-opt no-new-privileges
+    --cap-drop all
+    --pids-limit 2048
+    --memory 8g
+    --label io.spideros.workspace=kali-bay
+    --label "io.spideros.profile=$profile"
+    --label "io.spideros.net-raw=$net_raw"
+  )
+  if [ "$net_raw" = true ]; then
+    create_args+=(--cap-add NET_RAW)
+  fi
+
+  # Intentionally absent: --privileged, --network host, --device, and -v/--volume.
+  podman create "${create_args[@]}" "$image_name" sleep infinity
+  podman start "$container_name" >/dev/null
+  podman exec "$container_name" sh -lc \
+    "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y $metapackage && apt-get clean"
+
+  printf 'Kali Bay installed with %s. NET_RAW: %s.\n' "$metapackage" "$net_raw"
+  printf '%s\n' 'No Spider OS data or normal home folders are mounted into the container.'
+}
+
+enter_lab() {
+  if ! container_exists; then
+    printf '%s\n' "Run 'spider-security-lab setup' first." >&2
+    exit 1
+  fi
+  podman start "$container_name" >/dev/null
+  podman exec -it "$container_name" bash
+}
+
+stop_lab() {
+  if ! container_exists; then
+    printf '%s\n' 'Kali Bay does not exist.'
+    return 0
+  fi
+  podman stop "$container_name"
+}
+
+status_lab() {
+  if ! container_exists; then
+    printf '%s\n' 'Kali Bay: not installed'
+    return 0
+  fi
+  podman ps --all --filter "name=^${container_name}$"
+  podman inspect --format \
+    'Profile={{index .Config.Labels "io.spideros.profile"}} NET_RAW={{index .Config.Labels "io.spideros.net-raw"}} Privileged={{.HostConfig.Privileged}} NetworkMode={{.HostConfig.NetworkMode}}' \
+    "$container_name"
+}
+
+reset_lab() {
+  if ! container_exists; then
+    printf '%s\n' 'Kali Bay does not exist.'
+    exit 0
+  fi
+  if [ ! -t 0 ]; then
+    printf '%s\n' 'Kali Bay reset requires an interactive terminal.' >&2
+    exit 77
+  fi
+  printf '%s' 'Delete the entire Kali Bay container and its installed tools? Type RESET: '
+  read -r answer
+  if [ "$answer" != 'RESET' ]; then
+    printf '%s\n' 'Reset canceled.'
+    exit 1
+  fi
+  podman rm --force "$container_name"
+  printf '%s\n' 'Kali Bay container removed.'
+}
+
+require_rootless_podman
+command_name=${1:-help}
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$command_name" in
+  setup) setup_lab "$@" ;;
+  enter) enter_lab ;;
+  stop) stop_lab ;;
+  status) status_lab ;;
+  reset) reset_lab ;;
+  help|-h|--help) usage ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
