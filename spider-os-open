@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+systemctl --user start spider-os.service 2>/dev/null || true
+
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+  if curl --silent --fail --max-time 1 http://127.0.0.1:8765/api/health >/dev/null 2>&1; then
+    break
+  fi
+  attempt=$((attempt + 1))
+  sleep 0.2
+done
+
+if [ "$#" -gt 0 ] && [ "$1" = "--session" ]; then
+  marker_dir="$HOME/.config/spider-os"
+  marker="$marker_dir/session-opened"
+  mkdir -p "$marker_dir"
+  if [ -f "$marker" ]; then
+    exit 0
+  fi
+  : > "$marker"
+fi
+
+exec xdg-open http://127.0.0.1:8765/
+

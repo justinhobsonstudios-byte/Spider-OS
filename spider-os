@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+export PYTHONPATH=/usr/lib/spider-os
+exec python3 -m spider_os "$@"
+

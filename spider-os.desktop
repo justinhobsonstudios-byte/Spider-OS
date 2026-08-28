@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=The Web
+Comment=Spider OS whole-life desktop and resident Web AI
+Exec=spider-os-open
+Icon=spider-os
+Terminal=false
+Categories=Utility;Office;
+StartupNotify=true
+Keywords=AI;Tasks;Life;School;Music;Social Work;
+

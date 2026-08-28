@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=The Web Session
+Comment=Start The Web desktop layer for Spider OS
+Exec=spider-os-open --session
+Icon=spider-os
+Terminal=false
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2
+X-GNOME-Autostart-enabled=true
+

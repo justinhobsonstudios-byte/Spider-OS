@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+config_root="$HOME/.config/spider-os"
+marker="$config_root/desktop-initialized"
+if [ -f "$marker" ]; then
+  exit 0
+fi
+
+mkdir -p "$config_root"
+wallpaper=/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
+
+if command -v plasma-apply-wallpaperimage >/dev/null 2>&1 && [ -f "$wallpaper" ]; then
+  plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 || true
+fi
+if command -v kwriteconfig6 >/dev/null 2>&1; then
+  kwriteconfig6 --file kdeglobals --group General --key ColorScheme BreezeDark
+fi
+
+: > "$marker"
+
