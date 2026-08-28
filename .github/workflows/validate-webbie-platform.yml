@@ -78,7 +78,7 @@ jobs:
           cd "$PROJECT_ROOT"
           python3 -m pytest -q
 
-      - name: Exercise Web platform
+      - name: Exercise Web platform and Spider services
         shell: bash
         run: |
           set -euo pipefail
@@ -88,6 +88,12 @@ jobs:
           python3 -m spider_os devices > "$RUNNER_TEMP/devices.json"
           python3 -m spider_os mode studio > "$RUNNER_TEMP/mode.json"
           python3 -m spider_os system > "$RUNNER_TEMP/system.json"
+          python3 -m spider_os store status > "$RUNNER_TEMP/store.json"
+          python3 -m spider_os vault status > "$RUNNER_TEMP/vault.json"
+          python3 -m spider_os sync status > "$RUNNER_TEMP/sync.json"
+          python3 -m spider_os models route --sensitivity restricted --offline > "$RUNNER_TEMP/models.json"
+          python3 -m spider_os voice > "$RUNNER_TEMP/voice.json"
+          python3 -m spider_os studio status > "$RUNNER_TEMP/studio.json"
           python3 - "$RUNNER_TEMP" <<'PY'
           import json
           import pathlib
@@ -99,6 +105,12 @@ jobs:
           devices = load("devices.json")
           mode = load("mode.json")
           system = load("system.json")
+          store = load("store.json")
+          vault = load("vault.json")
+          sync = load("sync.json")
+          models = load("models.json")
+          voice = load("voice.json")
+          studio = load("studio.json")
 
           assert assembly["name"] == "Web Assembly", assembly
           assert assembly["resident_ai"] == "Webbie", assembly
@@ -108,5 +120,16 @@ jobs:
           assert system["name"] == "Spider Control Center", system
           assert system["updates"]["default_channel"] == "stable", system
           assert system["recovery"]["atomic_rollback"] is True, system
-          print("Web platform integration contracts passed")
+          assert store["name"] == "Spider Store", store
+          assert vault["name"] == "Spider Vault", vault
+          assert sync["name"] == "Spider Sync", sync
+          assert sync["enabled"] is False, sync
+          assert sync["security"]["encryption_required"] is True, sync
+          assert sync["security"]["encryption_verified"] is False, sync
+          assert models["route"] in {"local", "unavailable"}, models
+          assert models["route"] != "cloud", models
+          assert voice["name"] == "Webbie Voice Runtime", voice
+          assert studio["name"] == "Spider Studio", studio
+          assert studio["policy"]["base_distribution"] == "Aurora/Fedora", studio
+          print("Web platform and Spider service contracts passed")
           PY
