@@ -47,7 +47,7 @@ jobs:
           tools/apply-source-overrides.sh "$GITHUB_WORKSPACE" "$project_root"
           echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
 
-      - name: Validate Python, shell, and The Web assets
+      - name: Validate Python, shell, The Web, and image services
         shell: bash
         run: |
           set -euo pipefail
@@ -69,6 +69,19 @@ jobs:
           grep -Fq 'services.js' "$PROJECT_ROOT/src/spider_os/web/index.html"
           grep -Fq 'Name=The Web' "$PROJECT_ROOT/system_files/usr/share/applications/spider-os.desktop"
           grep -Fq 'Webbie resident intelligence' "$PROJECT_ROOT/system_files/usr/share/applications/spider-os.desktop"
+
+          voice_service="$PROJECT_ROOT/system_files/usr/lib/systemd/user/spider-webbie-voice.service"
+          test -f "$voice_service"
+          grep -Fq 'ExecStart=/usr/bin/spider-os voice listen' "$voice_service"
+          grep -Fq 'Restart=on-failure' "$voice_service"
+
+          build_script="$PROJECT_ROOT/build_files/build.sh"
+          grep -Fq 'python3-pocketsphinx' "$build_script"
+          grep -Fq 'pocketsphinx-models' "$build_script"
+          grep -Fq 'python3-sounddevice' "$build_script"
+          grep -Fq 'speech-dispatcher' "$build_script"
+          grep -Fq 'speech-dispatcher-espeak-ng' "$build_script"
+          grep -Fq 'systemctl --global enable spider-webbie-voice.service' "$build_script"
 
       - name: Run source tests
         shell: bash
@@ -92,7 +105,7 @@ jobs:
           python3 -m spider_os vault status > "$RUNNER_TEMP/vault.json"
           python3 -m spider_os sync status > "$RUNNER_TEMP/sync.json"
           python3 -m spider_os models route --sensitivity restricted --offline > "$RUNNER_TEMP/models.json"
-          python3 -m spider_os voice > "$RUNNER_TEMP/voice.json"
+          python3 -m spider_os voice status > "$RUNNER_TEMP/voice.json"
           python3 -m spider_os studio status > "$RUNNER_TEMP/studio.json"
           python3 - "$RUNNER_TEMP" <<'PY'
           import json
@@ -129,6 +142,10 @@ jobs:
           assert models["route"] in {"local", "unavailable"}, models
           assert models["route"] != "cloud", models
           assert voice["name"] == "Webbie Voice Runtime", voice
+          assert voice["policy"]["recognition"] == "local-only", voice
+          assert voice["policy"]["ambient_audio_stored"] is False, voice
+          assert voice["policy"]["non_addressed_speech_stored"] is False, voice
+          assert voice["voice_profile"]["requested_language"] == "en-AU", voice
           assert studio["name"] == "Spider Studio", studio
           assert studio["policy"]["base_distribution"] == "Aurora/Fedora", studio
           print("Web platform and Spider service contracts passed")
