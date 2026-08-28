@@ -2,6 +2,9 @@
 # Keep the engineering ISO self-contained: do not switch the installed
 # system to a registry reference during installation.
 
+[customizations.iso]
+volume_id = "SPIDER_OS"
+
 [customizations.installer.modules]
 enable = [
   "org.fedoraproject.Anaconda.Modules.Storage",
