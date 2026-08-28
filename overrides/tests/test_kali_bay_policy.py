@@ -34,11 +34,15 @@ class KaliBayPolicyTests(unittest.TestCase):
 
     def test_container_creation_has_no_host_escape_options(self) -> None:
         create_block = self.script.split("local -a create_args=(", 1)[1].split("podman create", 1)[0]
-        self.assertNotIn("--privileged", create_block)
-        self.assertNotIn("--network host", create_block)
-        self.assertNotIn("--device", create_block)
-        self.assertNotIn("--volume", create_block)
-        self.assertNotIn(" -v ", create_block)
+        operational = "\n".join(
+            line for line in create_block.splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        self.assertNotIn("--privileged", operational)
+        self.assertNotIn("--network host", operational)
+        self.assertNotIn("--device", operational)
+        self.assertNotIn("--volume", operational)
+        self.assertNotIn(" -v ", operational)
 
     def test_help_is_available_without_starting_podman(self) -> None:
         result = subprocess.run(
