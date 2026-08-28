@@ -13,6 +13,7 @@ on:
       - 'build_files/**'
       - 'system_files/**'
       - 'src/**'
+      - 'disk_config/**'
       - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
   pull_request:
@@ -25,11 +26,13 @@ on:
       - 'build_files/**'
       - 'system_files/**'
       - 'src/**'
+      - 'disk_config/**'
       - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: spider-os-iso-${{ github.ref }}
@@ -100,6 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f "$GITHUB_WORKSPACE/Containerfile"
+          test -f "$GITHUB_WORKSPACE/disk_config/iso-kde.toml"
           test -d "$PROJECT_ROOT/build_files"
           test -d "$PROJECT_ROOT/system_files"
           test -d "$PROJECT_ROOT/src/spider_os"
@@ -124,28 +128,6 @@ jobs:
           echo "Disk space after cleanup:"
           df -h /
 
-      - name: Pull bootc image builder
-        shell: bash
-        env:
-          BIB_IMAGE: quay.io/centos-bootc/bootc-image-builder:latest
-        run: |
-          set -euo pipefail
-          pulled=false
-          for attempt in 1 2 3 4; do
-            echo "Pulling bootc-image-builder (attempt $attempt of 4)..."
-            if sudo podman pull "$BIB_IMAGE"; then
-              pulled=true
-              break
-            fi
-            if [ "$attempt" -lt 4 ]; then
-              sleep $((attempt * 10))
-            fi
-          done
-          if [ "$pulled" != true ]; then
-            echo "Unable to download bootc-image-builder after 4 attempts." >&2
-            exit 1
-          fi
-
       - name: Build Spider OS bootc image
         shell: bash
         env:
@@ -160,33 +142,43 @@ jobs:
             "$PROJECT_ROOT"
           sudo podman run --rm localhost/spider-os:latest bootc container lint
 
-      - name: Build installer ISO
+      - name: Publish image for ISO builder
         shell: bash
         env:
-          BIB_IMAGE: quay.io/centos-bootc/bootc-image-builder:latest
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          output_dir="$GITHUB_WORKSPACE/output"
-          mkdir -p "$output_dir"
-          sudo podman run \
-            --rm \
-            --privileged \
-            --pull=never \
-            --security-opt label=type:unconfined_t \
-            --volume "$output_dir:/output" \
-            --volume /var/lib/containers/storage:/var/lib/containers/storage \
-            "$BIB_IMAGE" \
-            --type anaconda-iso \
-            --rootfs btrfs \
-            --chown "$(id -u):$(id -g)" \
-            localhost/spider-os:latest
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          image_ref="$registry/spider-os:ci-${GITHUB_SHA}"
+          printf '%s' "$GH_TOKEN" | sudo podman login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          sudo podman push localhost/spider-os:latest "$image_ref"
+          echo "SPIDER_IMAGE=$image_ref" >> "$GITHUB_ENV"
+          echo "RUNNER_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "RUNNER_GID=$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Build installer ISO
+        id: build-iso
+        uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d
+        with:
+          builder-image: quay.io/centos-bootc/bootc-image-builder:latest
+          config-file: ./disk_config/iso-kde.toml
+          image: ${{ env.SPIDER_IMAGE }}
+          chown: ${{ env.RUNNER_UID }}:${{ env.RUNNER_GID }}
+          rootfs: btrfs
+          types: anaconda-iso
+          additional-args: --use-librepo=True
 
       - name: Prepare ISO artifact
         shell: bash
+        env:
+          BUILT_ISO: ${{ steps.build-iso.outputs.anaconda-iso-output-path }}
         run: |
           set -euo pipefail
-          iso_path="$(find "$GITHUB_WORKSPACE/output" -type f -name '*.iso' -print -quit)"
-          if [ -z "$iso_path" ]; then
+          iso_path="$BUILT_ISO"
+          if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
+            iso_path="$(find "$GITHUB_WORKSPACE/output" -type f -name '*.iso' -print -quit)"
+          fi
+          if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
             echo "bootc-image-builder completed without producing an ISO." >&2
             find "$GITHUB_WORKSPACE/output" -maxdepth 4 -type f -print >&2 || true
             exit 1
