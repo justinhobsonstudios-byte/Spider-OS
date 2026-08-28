@@ -9,10 +9,13 @@ from .db import default_data_dir
 
 
 class SpiderSync:
-    """Provider-neutral encrypted sync configuration for Spider OS.
+    """Provider-neutral sync configuration for Spider OS.
 
     Sync is off by default. This module stores policy and provider selection only,
     never provider passwords or tokens. Credentials belong in Spider Vault.
+
+    Encryption is a hard requirement for remote sync, but this layer does not claim
+    that a provider is encrypted until provider-specific verification exists.
     """
 
     name = "Spider Sync"
@@ -35,13 +38,13 @@ class SpiderSync:
             "name": self.name,
             **config,
             "credentials": "Spider Vault",
+            "security": self._security(config),
         }
 
     def read(self) -> dict[str, Any]:
         defaults = {
             "enabled": False,
             "provider": "none",
-            "encrypted": True,
             "scopes": ["settings", "anchors", "threads"],
             "endpoint": None,
             "conflict_policy": "keep-both",
@@ -49,6 +52,9 @@ class SpiderSync:
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
             if isinstance(payload, dict):
+                # Ignore the legacy boolean `encrypted` field. Earlier builds used
+                # it as an intention flag, which was too easy to misread as proof.
+                payload.pop("encrypted", None)
                 defaults.update(payload)
         except (OSError, json.JSONDecodeError):
             pass
@@ -72,10 +78,11 @@ class SpiderSync:
             raise ValueError("sync cannot be enabled without a provider")
         if provider == "local-folder" and enabled and not endpoint:
             raise ValueError("local-folder sync requires a destination")
+        if provider == "webdav" and enabled and endpoint and not endpoint.lower().startswith("https://"):
+            raise ValueError("WebDAV sync requires an HTTPS endpoint")
         payload = {
             "enabled": bool(enabled),
             "provider": provider,
-            "encrypted": True,
             "scopes": sorted(set(requested_scopes)),
             "endpoint": endpoint if endpoint else None,
             "conflict_policy": "keep-both",
@@ -95,6 +102,10 @@ class SpiderSync:
         if action not in {"sync-now", "pause"}:
             raise ValueError("unknown sync action")
         config = self.read()
+        security = self._security(config)
+        ready = bool(config["enabled"] and config["provider"] != "none")
+        if action == "sync-now" and not security["encryption_verified"]:
+            ready = False
         return {
             "action": action,
             "provider": config["provider"],
@@ -102,4 +113,26 @@ class SpiderSync:
             "tier": "sensitive" if action == "sync-now" else "routine",
             "requires_approval": action == "sync-now",
             "executes": False,
+            "ready": ready,
+            "security": security,
+            "reason": (
+                None
+                if ready or action == "pause"
+                else "sync remains blocked until provider encryption is verified"
+            ),
+        }
+
+    @staticmethod
+    def _security(config: dict[str, Any]) -> dict[str, Any]:
+        provider = str(config.get("provider", "none"))
+        if provider == "none":
+            verification = "not-configured"
+        else:
+            verification = "provider-verification-pending"
+        return {
+            "encryption_required": True,
+            "encryption_verified": False,
+            "verification": verification,
+            "credential_store": "Spider Vault",
+            "secrets_in_sync_config": False,
         }
