@@ -57,7 +57,8 @@ capture_screen() {
   [ -S "$monitor" ] || return 0
   local ppm="${target%.png}.ppm"
   printf 'screendump %s\n' "$ppm" | socat - "UNIX-CONNECT:$monitor" >/dev/null 2>&1 || return 0
-  convert "$ppm" "$target"
+  [ -s "$ppm" ] || return 0
+  convert "$ppm" "$target" >/dev/null 2>&1 || return 0
   rm -f "$ppm"
 }
 
@@ -91,19 +92,13 @@ cat > "$kickstart_root/spider-ci.ks" <<KICKSTART
 %include /run/install/repo/osbuild-base.ks
 
 graphical
-lang en_US.UTF-8
-keyboard us
-timezone Etc/UTC --utc
-network --bootproto=dhcp --device=link --activate --onboot=on --hostname=spider-ci
 firewall --enabled --service=ssh
 services --enabled=NetworkManager,sshd,sddm
 
-rootpw --lock
 user --name=spiderci --groups=wheel --password='${password_hash}' --iscrypted
 sshkey --username=spiderci "${ssh_public_key}"
 
 zerombr
-clearpart --all --initlabel --disklabel=gpt
 autopart --noswap --type=btrfs
 reboot
 
@@ -158,7 +153,7 @@ qemu-system-x86_64 \
   -machine q35 \
   "${accel_args[@]}" \
   -m 6144 \
-  -smp 4 \
+  -smp 2 \
   -kernel "$kernel" \
   -initrd "$initrd" \
   -append "inst.stage2=hd:LABEL=SPIDER_OS inst.ks=http://10.0.2.2:${http_port}/spider-ci.ks ip=dhcp rd.neednet=1 inst.noninteractive console=tty0 console=ttyS0,115200n8" \
@@ -195,8 +190,8 @@ while kill -0 "$install_pid" >/dev/null 2>&1; do
 done
 install_pid=""
 
-grep -Eqi 'anaconda|installation|ostreecontainer|bootc' "$install_serial" || {
-  echo "Installer serial log never showed Anaconda or the bootc payload." >&2
+grep -Fq 'Install finished' "$install_serial" || {
+  echo "Anaconda rebooted without emitting the bootc install completion marker." >&2
   exit 1
 }
 if grep -Eqi 'installation failed|kickstart.*(error|failed)|traceback|kernel panic|dracut.*emergency' "$install_serial"; then
@@ -217,7 +212,7 @@ qemu-system-x86_64 \
   -machine q35 \
   "${accel_args[@]}" \
   -m 6144 \
-  -smp 4 \
+  -smp 2 \
   -boot order=c \
   -drive "file=$disk,format=qcow2,if=virtio" \
   -netdev "user,id=installednet,hostfwd=tcp:127.0.0.1:${ssh_port}-:22" \
