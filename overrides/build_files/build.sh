@@ -29,7 +29,10 @@ chmod 0755 \
   /usr/bin/spider-os-first-login \
   /usr/bin/spider-webbie-resident \
   /usr/bin/spider-hardware-report \
-  /usr/bin/spider-security-lab
+  /usr/bin/spider-security-lab \
+  /usr/libexec/spider-os-privileged-control
+
+chmod 0644 /usr/share/polkit-1/actions/com.spideros.control.policy
 
 systemctl --global enable spider-os.service
 systemctl --global enable spider-web-assembly.service

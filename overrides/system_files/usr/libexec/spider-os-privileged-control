@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This program is installed root-owned and is intended to be entered only through
+# pkexec/Polkit. Never accept a command line, path, package, image reference, or
+# shell fragment from the caller. The whitelist below is the complete interface.
+if [ "$(id -u)" -ne 0 ]; then
+  printf '%s\n' 'Spider privileged control must run as root through Polkit.' >&2
+  exit 77
+fi
+
+case "${PKEXEC_UID:-}" in
+  ''|0|*[!0-9]*)
+    printf '%s\n' 'Spider privileged control requires a non-root pkexec caller.' >&2
+    exit 77
+    ;;
+esac
+
+if [ "$#" -ne 1 ]; then
+  printf '%s\n' 'Exactly one approved Spider OS action is required.' >&2
+  exit 64
+fi
+
+case "$1" in
+  update)
+    exec /usr/bin/bootc upgrade
+    ;;
+  rollback)
+    exec /usr/bin/bootc rollback
+    ;;
+  reboot)
+    exec /usr/bin/systemctl reboot
+    ;;
+  *)
+    printf 'Unsupported Spider OS privileged action: %s\n' "$1" >&2
+    exit 64
+    ;;
+esac
