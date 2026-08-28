@@ -25,6 +25,13 @@ workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 mkdir -p "$workdir/grub" "$workdir/stamp"
 
+# Refuse to rewrite media that did not arrive with a hybrid boot layout. This
+# also proves the builder supplied boot equipment before we touch the ISO.
+xorriso -indev "$input_iso" -report_el_torito plain > "$workdir/source-el-torito.txt" 2>&1
+cat "$workdir/source-el-torito.txt"
+grep -Eiq 'BIOS' "$workdir/source-el-torito.txt"
+grep -Eiq 'UEFI' "$workdir/source-el-torito.txt"
+
 # The legacy bootc Anaconda ISO path currently creates /.buildstamp but asks
 # dracut to install ./buildstamp. Add the correctly named file to the finished
 # initramfs so Anaconda has product metadata from its first userspace process.
@@ -43,9 +50,11 @@ EOF
 initrd="$workdir/initrd.img"
 xorriso -osirrox on -indev "$input_iso" \
   -extract /images/pxeboot/initrd.img "$initrd" >/dev/null 2>&1
+test -s "$initrd"
 
 cpio_archive="$workdir/initrd.cpio"
 xz -dc "$initrd" > "$cpio_archive"
+test -s "$cpio_archive"
 (
   cd "$workdir/stamp"
   printf '.buildstamp\0' | cpio --null -o -H newc -A -F "$cpio_archive" >/dev/null 2>&1
@@ -53,6 +62,7 @@ xz -dc "$initrd" > "$cpio_archive"
 
 repaired_initrd="$workdir/initrd-repaired.img"
 xz --check=crc32 -9e -c "$cpio_archive" > "$repaired_initrd"
+test -s "$repaired_initrd"
 xz -dc "$repaired_initrd" | cpio -it --quiet | grep -Fx '.buildstamp' >/dev/null
 
 # bootc-image-builder can place GRUB configuration inside its EFI boot image
@@ -70,8 +80,6 @@ index=0
 
 if [ "${#grub_paths[@]}" -eq 0 ]; then
   echo "No standalone grub.cfg found in ISO filesystem; preserving embedded GRUB boot image unchanged."
-  echo "El Torito layout from source ISO:"
-  xorriso -indev "$input_iso" -report_el_torito plain 2>&1 || true
   echo "GRUB/EFI-related files visible in ISO filesystem:"
   xorriso -indev "$input_iso" -find / -type f -exec report_lba -- 2>/dev/null \
     | grep -Ei 'grub|efi|boot|isolinux' \
