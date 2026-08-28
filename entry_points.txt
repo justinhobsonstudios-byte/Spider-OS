@@ -1,0 +1,2 @@
+[console_scripts]
+spider-os = spider_os.cli:main

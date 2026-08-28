@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Spider OS First Login
+Comment=Apply Spider OS desktop defaults once
+Exec=spider-os-first-login
+Terminal=false
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=1
+X-GNOME-Autostart-enabled=true
+
