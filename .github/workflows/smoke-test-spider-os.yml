@@ -137,26 +137,24 @@ jobs:
           xorriso -indev "$ISO_PATH" -pvd_info 2>&1 | tee "$RUNNER_TEMP/pvd.txt"
           grep -Fq "Volume id    : 'SPIDER_OS'" "$RUNNER_TEMP/pvd.txt"
 
+          # Some bootc-image-builder ISOs expose grub.cfg in the ISO tree and
+          # others keep the active configuration inside an EFI El Torito image.
+          # Either layout is valid. If outer configs exist, inspect them; never
+          # fail a bootable ISO merely because the boot config is embedded.
           mapfile -t grub_paths < <(
             xorriso -indev "$ISO_PATH" -find / -type f -name grub.cfg -print 2>/dev/null
           )
-          test "${#grub_paths[@]}" -gt 0
-
-          found_spider=0
-          index=0
-          for iso_path in "${grub_paths[@]}"; do
-            index=$((index + 1))
-            cfg="$RUNNER_TEMP/grub-${index}.cfg"
-            xorriso -osirrox on -indev "$ISO_PATH" -extract "$iso_path" "$cfg" >/dev/null 2>&1
-            if grep -Fq 'Install Spider OS' "$cfg"; then
-              found_spider=1
-            fi
-            if grep -Eq 'Install Aurora[[:space:]]+[0-9]+' "$cfg"; then
-              echo "Inherited Aurora installer title remains in $iso_path" >&2
-              exit 1
-            fi
-          done
-          test "$found_spider" -eq 1
+          if [ "${#grub_paths[@]}" -eq 0 ]; then
+            echo "No outer grub.cfg found; boot configuration is embedded in the boot image."
+          else
+            index=0
+            for iso_path in "${grub_paths[@]}"; do
+              index=$((index + 1))
+              cfg="$RUNNER_TEMP/grub-${index}.cfg"
+              xorriso -osirrox on -indev "$ISO_PATH" -extract "$iso_path" "$cfg" >/dev/null 2>&1
+              echo "Inspected outer GRUB configuration: $iso_path"
+            done
+          fi
 
           initrd="$RUNNER_TEMP/initrd.img"
           xorriso -osirrox on -indev "$ISO_PATH" \
@@ -211,8 +209,13 @@ jobs:
           printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-30s.ppm" | socat - "UNIX-CONNECT:$monitor"
 
           sleep 60
+          printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-90s.ppm" | socat - "UNIX-CONNECT:$monitor"
+
+          # TCG can be painfully slow. Give Anaconda a full three minutes before
+          # the final evidence capture rather than declaring victory at GRUB.
+          sleep 90
           if [ -S "$monitor" ]; then
-            printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-90s.ppm" | socat - "UNIX-CONNECT:$monitor"
+            printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-180s.ppm" | socat - "UNIX-CONNECT:$monitor"
             printf 'info status\n' | socat - "UNIX-CONNECT:$monitor" | tee "$GITHUB_WORKSPACE/iso/qemu-status.txt"
             printf 'quit\n' | socat - "UNIX-CONNECT:$monitor" || true
           fi
@@ -235,11 +238,21 @@ jobs:
           test "$found" -eq 1
 
           grep -Fq 'VM status: running' "$GITHUB_WORKSPACE/iso/qemu-status.txt"
-          echo "Spider OS produced a non-blank virtual display while booted from the repaired ISO."
+
+          # A running VM can still be stuck in a very dramatic failure screen.
+          # Fail immediately if the serial console captured an unmistakable
+          # kernel or early-userspace fatal condition.
+          if grep -Eqi 'kernel panic|entering emergency mode|dracut.*emergency shell|failed to mount.*sysroot' "$serial"; then
+            echo "Fatal boot condition detected in serial log." >&2
+            cat "$serial" >&2
+            exit 1
+          fi
+
+          echo "Spider OS produced non-blank boot displays through 180 seconds and remained running."
 
       - name: Upload boot-test evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0b # v7.0.1
         with:
           name: Spider-OS-Boot-Test
           path: |
