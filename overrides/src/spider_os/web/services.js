@@ -56,7 +56,7 @@
         serviceCard("Spider Store", store.store?.available ? "ready" : "unavailable", [
           ["Installed", count(store.store?.installed)],
           ["Remotes", count(store.store?.remotes)],
-          ["Policy", store.store?.policy?.host_packages || "image-build-only"],
+          ["Scope", store.store?.policy?.flatpak_scope || "user"],
         ]),
         serviceCard("Spider Vault", vault.vault?.available ? "ready" : "provider needed", [
           ["Provider", vault.vault?.provider || "none"],
@@ -123,7 +123,11 @@
   }
 
   function storeSearchPanel() {
-    const panel = section("SPIDER STORE", "Search applications", "Flatpak-first discovery. Installs remain approval-gated.");
+    const panel = section(
+      "SPIDER STORE",
+      "Search applications",
+      "Flatpak-first discovery. Installs are per-user and require an explicit second confirmation."
+    );
     const form = node("form", "spider-service-form");
     const input = node("input");
     input.type = "search";
@@ -157,16 +161,60 @@
       return;
     }
     results.slice(0, 10).forEach((row) => {
+      const appId = row[0] || "";
       const item = node("div", "spider-service-result");
       const body = node("div");
-      body.append(text("strong", row[1] || row[0] || "Application"), text("span", row[0] || ""));
-      const plan = text("button", "Plan install");
+      body.append(text("strong", row[1] || appId || "Application"), text("span", appId));
+      const plan = text("button", "Review install");
       plan.type = "button";
       plan.className = "button-secondary";
-      plan.addEventListener("click", () => showPlan(item, "/api/store/plan", {action: "install", app_id: row[0] || ""}));
+      plan.addEventListener("click", () => reviewStoreInstall(item, appId));
       item.append(body, plan);
       target.appendChild(item);
     });
+  }
+
+  async function reviewStoreInstall(target, appId) {
+    target.querySelector(".spider-store-confirm")?.remove();
+    try {
+      const result = await api("/api/store/plan", {
+        method: "POST",
+        body: {action: "install", app_id: appId, remote: "flathub"},
+      });
+      const plan = result.plan || {};
+      showInline(target, (plan.command || []).join(" ") || "Install plan ready");
+
+      const confirmWrap = node("div", "spider-service-actions spider-store-confirm");
+      const install = text("button", "Install for me");
+      install.type = "button";
+      install.className = "button-secondary";
+      install.addEventListener("click", async () => {
+        if (!window.confirm("Install " + appId + " for your Spider OS user?")) return;
+        install.disabled = true;
+        install.textContent = "Installing…";
+        try {
+          const executed = await api("/api/store/execute", {
+            method: "POST",
+            body: {
+              action: "install",
+              app_id: appId,
+              remote: "flathub",
+              confirmation: appId,
+            },
+          });
+          showInline(target, executed.result?.executed ? "Installed " + appId : "Install finished");
+          confirmWrap.remove();
+        } catch (error) {
+          showInline(target, error.message);
+          install.disabled = false;
+          install.textContent = "Install for me";
+        }
+      });
+      confirmWrap.appendChild(install);
+      target.appendChild(confirmWrap);
+    } catch (error) {
+      showInline(target, error.message);
+    }
   }
 
   function routingPanel() {
@@ -227,8 +275,7 @@
   }
 
   function note(value, error = false) {
-    const item = text("p", value, "platform-loading" + (error ? " error" : ""));
-    return item;
+    return text("p", value, "platform-loading" + (error ? " error" : ""));
   }
 
   function count(value) {
