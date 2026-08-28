@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+config_root="$HOME/.config/spider-os"
+marker="$config_root/desktop-initialized"
+mkdir -p "$config_root"
+
+wallpaper=/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
+if [ ! -f "$marker" ]; then
+  if command -v plasma-apply-wallpaperimage >/dev/null 2>&1 && [ -f "$wallpaper" ]; then
+    plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 || true
+  fi
+  if command -v kwriteconfig6 >/dev/null 2>&1; then
+    kwriteconfig6 --file kdeglobals --group General --key ColorScheme BreezeDark
+  fi
+  : > "$marker"
+fi
+
+# First boot is not complete until Spider Setup has written its private marker.
+setup_state="${XDG_DATA_HOME:-$HOME/.local/share}/spider-os/setup.json"
+if [ ! -f "$setup_state" ]; then
+  # Do not block Plasma startup on the wizard.
+  (sleep 2; /usr/bin/spider-os setup) >/tmp/spider-setup.log 2>&1 &
+fi
