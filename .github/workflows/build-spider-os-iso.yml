@@ -14,6 +14,7 @@ on:
       - 'system_files/**'
       - 'src/**'
       - 'disk_config/**'
+      - 'tools/**'
       - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
   pull_request:
@@ -27,6 +28,7 @@ on:
       - 'system_files/**'
       - 'src/**'
       - 'disk_config/**'
+      - 'tools/**'
       - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
 
@@ -53,14 +55,20 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          command -v podman >/dev/null 2>&1 || missing=1
-          command -v unzip >/dev/null 2>&1 || missing=1
+          for command in podman unzip xorriso cpio xz; do
+            command -v "$command" >/dev/null 2>&1 || missing=1
+          done
           if [ "$missing" -eq 1 ]; then
             sudo apt-get update
-            sudo apt-get install -y podman unzip
+            sudo apt-get install -y --no-install-recommends \
+              podman \
+              unzip \
+              xorriso \
+              cpio \
+              xz-utils
           fi
           podman --version
-          unzip -v | head -n 2
+          xorriso -version | head -n 1
 
       - name: Select Spider OS source tree
         shell: bash
@@ -104,9 +112,11 @@ jobs:
           set -euo pipefail
           test -f "$GITHUB_WORKSPACE/Containerfile"
           test -f "$GITHUB_WORKSPACE/disk_config/iso-kde.toml"
+          test -f "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
           test -d "$PROJECT_ROOT/build_files"
           test -d "$PROJECT_ROOT/system_files"
           test -d "$PROJECT_ROOT/src/spider_os"
+          bash -n "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
@@ -168,7 +178,7 @@ jobs:
           types: anaconda-iso
           additional-args: --use-librepo=True
 
-      - name: Prepare ISO artifact
+      - name: Repair Spider OS installer metadata
         shell: bash
         env:
           BUILT_ISO: ${{ steps.build-iso.outputs.anaconda-iso-output-path }}
@@ -183,8 +193,17 @@ jobs:
             find "$GITHUB_WORKSPACE/output" -maxdepth 4 -type f -print >&2 || true
             exit 1
           fi
-          cp "$iso_path" "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
+          chmod +x "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
+          "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh" \
+            "$iso_path" \
+            "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
+
+      - name: Prepare ISO artifact
+        shell: bash
+        run: |
+          set -euo pipefail
           cd "$GITHUB_WORKSPACE"
+          test -f Spider_OS_x86_64.iso
           sha256sum Spider_OS_x86_64.iso > Spider_OS_x86_64.iso.sha256
           ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
 
