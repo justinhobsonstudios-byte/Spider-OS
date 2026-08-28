@@ -13,6 +13,7 @@ from .assembly import WebAssembly, read_assembly_state
 from .constants import DEFAULT_HOST, DEFAULT_PORT
 from .db import Database
 from .devices import DeviceWeb
+from .hardware import HardwareValidator
 from .model_router import ModelRouter
 from .modes import MODES, ModeManager
 from .platform import install_server_extensions
@@ -51,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     devices = subparsers.add_parser("devices", help="inspect the Device Web")
     devices.add_argument("operation", choices=["scan"], nargs="?", default="scan")
+    subparsers.add_parser("hardware", help="run privacy-safe Spider hardware validation")
 
     mode = subparsers.add_parser("mode", help="read or change Spider OS workspace mode")
     mode.add_argument("name", choices=["status", *MODES.keys()], nargs="?", default="status")
@@ -108,6 +110,7 @@ def doctor(database: Database) -> dict[str, object]:
         "local_ai": ai_status,
         "web_assembly": read_assembly_state(),
         "setup": SetupStore().read(),
+        "hardware": HardwareValidator().snapshot(),
         "vault": SpiderVault().status(),
         "sync": SpiderSync().status(),
         "voice": VoiceRuntime().status(),
@@ -144,6 +147,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "devices":
         _print(DeviceWeb().snapshot())
+        return 0
+    if command == "hardware":
+        _print(HardwareValidator().snapshot())
         return 0
     if command == "mode":
         manager = ModeManager()
