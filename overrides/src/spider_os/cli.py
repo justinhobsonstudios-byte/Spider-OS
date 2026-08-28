@@ -58,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("name", choices=["status", *MODES.keys()], nargs="?", default="status")
 
     system = subparsers.add_parser("system", help="Spider Control Center backend")
-    system.add_argument("operation", choices=["status", "plan"], nargs="?", default="status")
+    system.add_argument("operation", choices=["status", "plan", "execute"], nargs="?", default="status")
     system.add_argument("action", choices=["update", "rollback", "reboot"], nargs="?")
 
     store = subparsers.add_parser("store", help="inspect Spider Store or create an app action plan")
@@ -160,7 +160,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.operation == "status":
             _print(control.snapshot())
         elif not args.action:
-            raise SystemExit("system plan requires update, rollback, or reboot")
+            raise SystemExit("system plan/execute requires update, rollback, or reboot")
+        elif args.operation == "execute":
+            _print(control.execute(args.action))
         else:
             _print(control.action_plan(args.action))
         return 0
