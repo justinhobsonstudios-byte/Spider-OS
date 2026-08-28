@@ -7,6 +7,7 @@ from typing import Any
 from .assembly import read_assembly_state
 from .constants import AI_NAME, DESKTOP_NAME, STARTUP_NAME
 from .devices import DeviceWeb
+from .hardware import HardwareValidator
 from .model_router import ModelRouter
 from .modes import MODES, ModeManager
 from .resident import read_resident_state
@@ -35,6 +36,7 @@ def platform_snapshot(*, refresh_devices: bool = False) -> dict[str, Any]:
         "modes": {name: dict(settings) for name, settings in MODES.items()},
         "setup": setup.read(),
         "devices": devices.snapshot() if refresh_devices else devices.current(),
+        "hardware": HardwareValidator().snapshot(),
         "vault": SpiderVault().status(),
         "sync": SpiderSync().status(),
         "voice": VoiceRuntime().status(),
@@ -69,6 +71,7 @@ def install_server_extensions() -> None:
             "mode": platform["mode"],
             "setup": platform["setup"],
             "devices": platform["devices"],
+            "hardware": platform["hardware"],
             "vault": platform["vault"],
             "sync": platform["sync"],
             "voice": platform["voice"],
@@ -84,6 +87,7 @@ def install_server_extensions() -> None:
                 platform_paths = {
                     "/api/platform",
                     "/api/devices",
+                    "/api/hardware",
                     "/api/system",
                     "/api/mode",
                     "/api/setup",
@@ -111,6 +115,8 @@ def install_server_extensions() -> None:
                             HTTPStatus.OK,
                             {"devices": devices.snapshot() if refresh else devices.current()},
                         )
+                    elif parsed.path == "/api/hardware":
+                        self._json(HTTPStatus.OK, {"hardware": HardwareValidator().snapshot()})
                     elif parsed.path == "/api/system":
                         self._json(HTTPStatus.OK, {"system": SystemControl().snapshot()})
                     elif parsed.path == "/api/mode":
