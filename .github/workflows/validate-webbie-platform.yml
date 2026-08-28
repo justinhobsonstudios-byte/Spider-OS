@@ -55,6 +55,8 @@ jobs:
           while IFS= read -r script; do bash -n "$script"; done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
           bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-os-first-login"
           bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-webbie-resident"
+          bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-hardware-report"
+          grep -Fq 'exec /usr/bin/spider-os hardware' "$PROJECT_ROOT/system_files/usr/bin/spider-hardware-report"
           test -f "$PROJECT_ROOT/src/spider_os/web/platform.js"
           test -f "$PROJECT_ROOT/src/spider_os/web/platform.css"
           test -f "$PROJECT_ROOT/src/spider_os/web/services.js"
@@ -99,6 +101,7 @@ jobs:
           export SPIDER_OS_DATA_DIR="$RUNNER_TEMP/spider-data"
           python3 -m spider_os assembly > "$RUNNER_TEMP/assembly.json"
           python3 -m spider_os devices > "$RUNNER_TEMP/devices.json"
+          python3 -m spider_os hardware > "$RUNNER_TEMP/hardware.json"
           python3 -m spider_os mode studio > "$RUNNER_TEMP/mode.json"
           python3 -m spider_os system > "$RUNNER_TEMP/system.json"
           python3 -m spider_os store status > "$RUNNER_TEMP/store.json"
@@ -116,6 +119,7 @@ jobs:
           load = lambda name: json.loads((root / name).read_text())
           assembly = load("assembly.json")
           devices = load("devices.json")
+          hardware = load("hardware.json")
           mode = load("mode.json")
           system = load("system.json")
           store = load("store.json")
@@ -128,6 +132,12 @@ jobs:
           assert assembly["name"] == "Web Assembly", assembly
           assert assembly["resident_ai"] == "Webbie", assembly
           assert devices["name"] == "Device Web", devices
+          assert hardware["name"] == "Spider Hardware Validation", hardware
+          assert hardware["privacy"]["serial_numbers_collected"] is False, hardware
+          assert hardware["privacy"]["service_tags_collected"] is False, hardware
+          assert hardware["privacy"]["hardware_uuids_collected"] is False, hardware
+          assert hardware["privacy"]["mac_addresses_collected"] is False, hardware
+          assert hardware["image_guidance"]["default"] == "aurora-stable", hardware
           assert mode["mode"] == "studio", mode
           assert mode["address_name"] == "Justin", mode
           assert system["name"] == "Spider Control Center", system
@@ -148,5 +158,5 @@ jobs:
           assert voice["voice_profile"]["requested_language"] == "en-AU", voice
           assert studio["name"] == "Spider Studio", studio
           assert studio["policy"]["base_distribution"] == "Aurora/Fedora", studio
-          print("Web platform and Spider service contracts passed")
+          print("Web platform, hardware, and Spider service contracts passed")
           PY
