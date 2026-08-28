@@ -47,7 +47,7 @@ jobs:
           tools/apply-source-overrides.sh "$GITHUB_WORKSPACE" "$project_root"
           echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
 
-      - name: Validate Python and shell
+      - name: Validate Python, shell, and The Web assets
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +55,15 @@ jobs:
           while IFS= read -r script; do bash -n "$script"; done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
           bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-os-first-login"
           bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-webbie-resident"
+          test -f "$PROJECT_ROOT/src/spider_os/web/platform.js"
+          test -f "$PROJECT_ROOT/src/spider_os/web/platform.css"
+          node --check "$PROJECT_ROOT/src/spider_os/web/app.js"
+          node --check "$PROJECT_ROOT/src/spider_os/web/platform.js"
+          grep -Fq 'id="platformStrip"' "$PROJECT_ROOT/src/spider_os/web/index.html"
+          grep -Fq 'platform.css' "$PROJECT_ROOT/src/spider_os/web/index.html"
+          grep -Fq 'platform.js' "$PROJECT_ROOT/src/spider_os/web/index.html"
+          grep -Fq 'Name=The Web' "$PROJECT_ROOT/system_files/usr/share/applications/spider-os.desktop"
+          grep -Fq 'Webbie resident intelligence' "$PROJECT_ROOT/system_files/usr/share/applications/spider-os.desktop"
 
       - name: Run source tests
         shell: bash
