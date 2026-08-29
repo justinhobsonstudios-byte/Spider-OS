@@ -14,9 +14,9 @@ ProtectSystem=strict
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LockPersonality=true
 MemoryDenyWriteExecute=true
-Environment="SPIDER_AI_WAKE_PHRASES=Hey Webbie;Webbie;Hey Web;Web"
+Environment=SPIDER_OS_VOICE_ENABLED=1
 Environment=SPIDER_OS_PROACTIVE=1
-Environment="SPIDER_OS_WAKE_PHRASES=Hey Web,Web"
+Environment="SPIDER_OS_WAKE_PHRASES=Hey Webbie,Webbie,Hey Web,Web"
 
 Environment="SPIDER_OS_PROACTIVE_LEVEL=very-high"
 Environment="SPIDER_OS_ATTENTION_STYLE=cue-then-speak"
