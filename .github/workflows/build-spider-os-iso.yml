@@ -15,7 +15,6 @@ on:
       - 'src/**'
       - 'disk_config/**'
       - 'tools/**'
-      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
   pull_request:
     branches:
@@ -29,7 +28,6 @@ on:
       - 'src/**'
       - 'disk_config/**'
       - 'tools/**'
-      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
 
 permissions:
@@ -81,35 +79,26 @@ jobs:
         run: |
           set -euo pipefail
           project_root="$GITHUB_WORKSPACE"
-          if [ ! -d "$project_root/build_files" ] || \
-             [ ! -d "$project_root/system_files" ] || \
-             [ ! -d "$project_root/src/spider_os" ]; then
-            archive="$GITHUB_WORKSPACE/Spider_OS_v0.7_GitHub_ISO_Ready.zip"
-            if [ ! -f "$archive" ]; then
-              echo "Required source folders are missing and the ISO-ready source archive was not found." >&2
-              exit 1
+          required=(
+            build_files/build.sh
+            system_files/usr/lib/systemd/user/spider-ai-resident.service
+            system_files/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
+            system_files/usr/share/sounds/SpiderOS/stereo/spider-ai-ready.wav
+            src/spider_os/resident.py
+            src/spider_os/web/assets/spider-mark.svg
+          )
+          missing=0
+          for item in "${required[@]}"; do
+            if [ ! -e "$project_root/$item" ]; then
+              echo "Missing canonical Spider OS source: $item" >&2
+              missing=1
             fi
-            extract_root="$RUNNER_TEMP/spider-os-source"
-            rm -rf "$extract_root"
-            mkdir -p "$extract_root"
-            unzip -q "$archive" -d "$extract_root"
-            project_root=""
-            while IFS= read -r containerfile; do
-              candidate="$(dirname "$containerfile")"
-              if [ -d "$candidate/build_files" ] && \
-                 [ -d "$candidate/system_files" ] && \
-                 [ -d "$candidate/src/spider_os" ]; then
-                project_root="$candidate"
-                break
-              fi
-            done < <(find "$extract_root" -type f -name Containerfile -print)
-            if [ -z "$project_root" ]; then
-              echo "Could not find a complete Spider OS image-template tree inside the archive." >&2
-              find "$extract_root" -maxdepth 3 -type f -print | sort | head -n 200 >&2
-              exit 1
-            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Refusing to build without the canonical Spider OS source tree." >&2
+            exit 1
           fi
-          echo "Using Spider OS source tree: $project_root"
+          echo "Using canonical Spider OS source tree: $project_root"
           echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
 
       - name: Validate source
