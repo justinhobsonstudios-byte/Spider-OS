@@ -110,7 +110,7 @@ install -d -m 0755 /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/99-spider-ci-autologin.conf <<'SDDM'
 [Autologin]
 User=spiderci
-Session=plasma
+Session=plasma.desktop
 Relogin=false
 SDDM
 install -d -m 0750 /etc/sudoers.d
