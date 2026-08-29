@@ -92,27 +92,6 @@ for file in test_*.py; do
   install -m 0644 "$file" "tests/$file"
 done
 
-python3 - <<'PY'
-from pathlib import Path
-
-path = Path(".github/workflows/build-spider-os-iso.yml")
-text = path.read_text(encoding="utf-8")
-start_marker = '          project_root="$GITHUB_WORKSPACE"\n'
-end_marker = '          echo "Using Spider OS source tree: $project_root"\n'
-start = text.find(start_marker)
-if start < 0:
-    raise SystemExit("Could not find legacy source-selection start")
-end_start = text.find(end_marker, start)
-if end_start < 0:
-    raise SystemExit("Could not find legacy source-selection end")
-end = end_start + len(end_marker)
-
-replacement = '''          project_root="$GITHUB_WORKSPACE"\n          required=(\n            build_files/build.sh\n            system_files/usr/lib/systemd/user/spider-ai-resident.service\n            system_files/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg\n            system_files/usr/share/sounds/SpiderOS/stereo/spider-ai-ready.wav\n            src/spider_os/resident.py\n            src/spider_os/web/assets/spider-mark.svg\n          )\n          missing=0\n          for item in "${required[@]}"; do\n            if [ ! -e "$project_root/$item" ]; then\n              echo "Missing canonical Spider OS source: $item" >&2\n              missing=1\n            fi\n          done\n          if [ "$missing" -ne 0 ]; then\n            echo "Refusing to build from a legacy archive fallback." >&2\n            exit 1\n          fi\n          echo "Using canonical Spider OS source tree: $project_root"\n'''
-text = text[:start] + replacement + text[end:]
-text = text.replace("      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'\n", "")
-path.write_text(text, encoding="utf-8")
-PY
-
 git rm -f --ignore-unmatch \
   __init__.py __main__.py actions.py ai.py authority.py cli.py constants.py \
   db.py learning.py personal_web.py preload.py proactive.py research.py resident.py \
@@ -139,8 +118,11 @@ grep -Fq 'Hey Webbie;Webbie;Hey Web;Web' \
   system_files/usr/lib/systemd/user/spider-ai-resident.service
 ! test -e resident.py
 ! test -e Spider_OS_v0.7_GitHub_ISO_Ready.zip
-! grep -Fq 'unzip -q "$archive"' .github/workflows/build-spider-os-iso.yml
 
 bash -n build_files/build.sh
 python3 -m compileall -q src/spider_os
 python3 -m pytest -q
+
+# Validation creates bytecode caches; keep generated files out of source control.
+find src tests -type d -name __pycache__ -prune -exec rm -rf {} +
+find src tests -type f -name '*.pyc' -delete
