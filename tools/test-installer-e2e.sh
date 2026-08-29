@@ -106,13 +106,33 @@ autopart --noswap --type=btrfs
 reboot
 
 %post --log=/root/spider-ci-post.log
+session=''
+for candidate in \
+  /usr/share/wayland-sessions/plasma.desktop \
+  /usr/share/wayland-sessions/plasmawayland.desktop \
+  /usr/share/xsessions/plasma.desktop \
+  /usr/share/xsessions/plasmawayland.desktop
+do
+  if [ -f "\$candidate" ]; then
+    session="\$(basename "\$candidate")"
+    break
+  fi
+done
+if [ -z "\$session" ]; then
+  session="\$(find /usr/share/wayland-sessions /usr/share/xsessions -maxdepth 1 -type f -iname '*plasma*.desktop' 2>/dev/null | sed -n '1{s|.*/||;p;}')"
+fi
+if [ -z "\$session" ]; then
+  echo 'No Plasma desktop session file found for Spider OS CI autologin.' >&2
+  exit 1
+fi
 install -d -m 0755 /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/99-spider-ci-autologin.conf <<'SDDM'
+cat > /etc/sddm.conf.d/99-spider-ci-autologin.conf <<SDDM
 [Autologin]
 User=spiderci
-Session=plasma.desktop
+Session=\$session
 Relogin=false
 SDDM
+printf 'Selected Plasma session: %s\n' "\$session" > /etc/spider-ci-session
 install -d -m 0750 /etc/sudoers.d
 echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/99-spider-ci
 chmod 0440 /etc/sudoers.d/99-spider-ci
@@ -213,7 +233,7 @@ fi
 qemu-img info "$disk" | tee "$evidence/installed-disk.txt"
 
 # Boot only the installed disk. SSH proves the deployed OS reached userspace;
-# SDDM autologin then exercises the real KDE autostart entries used by Cory.
+# SDDM autologin then exercises the real KDE autostart entries used by Spider OS.
 installed_monitor="$workdir/installed-monitor.sock"
 installed_pidfile="$workdir/installed.pid"
 installed_serial="$evidence/installed-serial.log"
@@ -247,6 +267,65 @@ ssh_args=(
   spiderci@127.0.0.1
 )
 
+capture_session_diagnostics() {
+  local target="$1"
+  ssh "${ssh_args[@]}" 'set +e
+    echo "=== CI install markers ==="
+    sudo cat /etc/spider-ci-session 2>/dev/null
+    sudo cat /etc/sddm.conf.d/99-spider-ci-autologin.conf 2>/dev/null
+    echo
+    echo "=== system boot/display state ==="
+    systemctl get-default
+    sudo systemctl --no-pager --full status display-manager graphical.target
+    echo
+    echo "=== SDDM journal ==="
+    sudo journalctl -b -u sddm --no-pager
+    echo
+    echo "=== login sessions ==="
+    loginctl list-sessions
+    loginctl show-user spiderci
+    for sid in $(loginctl list-sessions --no-legend 2>/dev/null | awk "{print \$1}"); do
+      echo "--- session $sid ---"
+      loginctl show-session "$sid" -a
+    done
+    who
+    echo
+    echo "=== Plasma/SDDM processes ==="
+    ps -ef | grep -E "[s]ddm|[k]win|[p]lasmashell|[s]tartplasma|[k]ded"
+    echo
+    echo "=== installed session files ==="
+    ls -la /usr/share/wayland-sessions /usr/share/xsessions 2>/dev/null
+    for desktop in /usr/share/wayland-sessions/*plasma*.desktop /usr/share/xsessions/*plasma*.desktop; do
+      [ -f "$desktop" ] || continue
+      echo "--- $desktop ---"
+      cat "$desktop"
+    done
+    echo
+    echo "=== Web Assembly markers ==="
+    ls -la "$HOME/.config/spider-os" 2>/dev/null
+    echo
+    echo "=== user service state ==="
+    systemctl --user --no-pager --full status spider-os.service spider-ai-resident.service
+    systemctl --user show-environment
+    journalctl --user -b -u spider-os.service -u spider-ai-resident.service --no-pager
+    echo
+    echo "=== session logs ==="
+    for log in \
+      "$HOME/.local/share/sddm/wayland-session.log" \
+      "$HOME/.local/share/sddm/xorg-session.log" \
+      "$HOME/.local/share/plasmalogin/wayland-session.log" \
+      "$HOME/.local/share/plasmalogin/xorg-session.log" \
+      "$HOME/.xsession-errors"; do
+      [ -f "$log" ] || continue
+      echo "--- $log ---"
+      cat "$log"
+    done
+    echo
+    echo "=== package state ==="
+    rpm -q sddm plasma-workspace 2>/dev/null
+  ' > "$target" 2>&1 || true
+}
+
 boot_started="$SECONDS"
 ssh_ready=0
 while [ $((SECONDS - boot_started)) -lt "$first_login_timeout" ]; do
@@ -262,6 +341,8 @@ while [ $((SECONDS - boot_started)) -lt "$first_login_timeout" ]; do
 done
 [ "$ssh_ready" -eq 1 ] || {
   capture_screen "$installed_monitor" "$evidence/installed-ssh-timeout.png"
+  printf 'info status\n' | socat - "UNIX-CONNECT:$installed_monitor" \
+    > "$evidence/installed-ssh-timeout-qemu-status.txt" 2>&1 || true
   echo "Installed Spider OS never became reachable over SSH." >&2
   exit 1
 }
@@ -280,8 +361,7 @@ while [ $((SECONDS - boot_started)) -lt "$first_login_timeout" ]; do
 done
 [ "$assembly_ready" -eq 1 ] || {
   capture_screen "$installed_monitor" "$evidence/web-assembly-timeout.png"
-  ssh "${ssh_args[@]}" 'systemctl --user --no-pager --full status spider-os.service spider-ai-resident.service || true' \
-    > "$evidence/web-assembly-status.txt" 2>&1 || true
+  capture_session_diagnostics "$evidence/web-assembly-diagnostics.txt"
   echo "Installed Spider OS booted, but Web Assembly did not complete." >&2
   exit 1
 }
@@ -289,6 +369,7 @@ done
 ssh "${ssh_args[@]}" '
   set -eu
   test -f /etc/spider-ci-installed
+  test -s /etc/spider-ci-session
   test -x /usr/bin/spider-os
   test -x /usr/bin/spider-os-first-login
   systemctl --user is-active spider-os.service
