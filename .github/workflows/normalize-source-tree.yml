@@ -7,11 +7,13 @@ on:
       - fix/graphical-installer-gate
     paths:
       - '.github/workflows/normalize-source-tree.yml'
+      - 'tools/normalize-source-tree.sh'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/normalize-source-tree.yml'
+      - 'tools/normalize-source-tree.sh'
 
 permissions:
   contents: write
