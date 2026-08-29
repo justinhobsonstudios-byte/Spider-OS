@@ -112,12 +112,15 @@ jobs:
           test -d "$PROJECT_ROOT/build_files"
           test -d "$PROJECT_ROOT/system_files"
           test -d "$PROJECT_ROOT/src/spider_os"
+          test -d "$PROJECT_ROOT/tests"
           bash -n "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
           bash -n "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
           python3 -m compileall -q "$PROJECT_ROOT/src/spider_os"
+          PYTHONPATH="$PROJECT_ROOT/src" python3 -m unittest discover \
+            -s "$PROJECT_ROOT/tests" -v
 
       - name: Free runner disk space
         shell: bash
