@@ -1,0 +1,8 @@
+[Sound Theme]
+Name=Spider OS
+Comment=Subtle dark industrial sound identity for Spider OS
+Directories=stereo
+Inherits=freedesktop
+
+[stereo]
+OutputProfile=stereo
