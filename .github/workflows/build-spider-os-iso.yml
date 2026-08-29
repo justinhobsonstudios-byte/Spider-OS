@@ -199,6 +199,7 @@ jobs:
             "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
 
       - name: Install, reboot, and verify Web Assembly
+        id: installer-e2e
         shell: bash
         timeout-minutes: 130
         run: |
@@ -216,6 +217,7 @@ jobs:
 
       - name: Upload full-install evidence
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-Install-Test
@@ -224,15 +226,21 @@ jobs:
           retention-days: 14
 
       - name: Prepare ISO artifact
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          test -f Spider_OS_x86_64.iso
+          if [ ! -f Spider_OS_x86_64.iso ]; then
+            echo "Spider OS ISO is unavailable; nothing to preserve from this run."
+            exit 0
+          fi
           sha256sum Spider_OS_x86_64.iso > Spider_OS_x86_64.iso.sha256
           ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
 
       - name: Upload Spider OS ISO
+        if: always()
+        continue-on-error: ${{ steps.installer-e2e.outcome != 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-ISO
