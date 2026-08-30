@@ -223,10 +223,10 @@ jobs:
           name: Spider-OS-Install-Test
           path: iso-e2e-evidence/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
 
       - name: Prepare ISO artifact
-        if: always()
+        if: ${{ steps.installer-e2e.outcome == 'success' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -239,8 +239,7 @@ jobs:
           ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
 
       - name: Upload Spider OS ISO
-        if: always()
-        continue-on-error: ${{ steps.installer-e2e.outcome != 'success' }}
+        if: ${{ steps.installer-e2e.outcome == 'success' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-ISO
@@ -249,4 +248,29 @@ jobs:
             Spider_OS_x86_64.iso.sha256
           if-no-files-found: error
           compression-level: 0
-          retention-days: 14
+          retention-days: 1
+
+      - name: Remove ephemeral CI container image
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="$GITHUB_REPOSITORY_OWNER"
+          package="spider-os"
+          tag="ci-${GITHUB_SHA}"
+          version_id="$(
+            gh api --paginate \
+              "/users/$owner/packages/container/$package/versions?per_page=100" \
+              --jq ".[] | select((.metadata.container.tags // []) | index(\"$tag\")) | .id" \
+              | head -n 1
+          )"
+          if [ -n "$version_id" ]; then
+            echo "Removing ephemeral container version $version_id ($tag)"
+            gh api --method DELETE \
+              "/users/$owner/packages/container/$package/versions/$version_id"
+          else
+            echo "No ephemeral container version found for $tag"
+          fi
