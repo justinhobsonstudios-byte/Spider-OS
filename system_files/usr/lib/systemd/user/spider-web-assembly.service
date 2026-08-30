@@ -1,0 +1,14 @@
+[Unit]
+Description=Spider OS Web Assembly
+After=graphical-session.target spider-os.service
+Wants=spider-os.service
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/spider-os-first-login
+ExecStart=/usr/bin/spider-os-open --session
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical-session.target
