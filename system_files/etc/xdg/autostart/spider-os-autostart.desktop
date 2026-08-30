@@ -2,7 +2,7 @@
 Type=Application
 Name=The Web Session
 Comment=Start The Web desktop layer for Spider OS
-Exec=spider-os-open --session
+Exec=/bin/bash /usr/libexec/spider-os-session-bootstrap
 Icon=spider-os
 Terminal=false
 OnlyShowIn=KDE;
