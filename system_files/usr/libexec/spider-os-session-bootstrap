@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -u
+
+# KDE/SDDM can start before the user systemd manager has the session's graphical
+# environment. Import it before starting Web Assembly so xdg-open and any KDE
+# helpers run in the real logged-in desktop session.
+systemctl --user import-environment \
+  DISPLAY \
+  WAYLAND_DISPLAY \
+  XDG_CURRENT_DESKTOP \
+  XDG_SESSION_DESKTOP \
+  XDG_SESSION_TYPE \
+  DBUS_SESSION_BUS_ADDRESS 2>/dev/null || true
+
+# Clear stale failures from an earlier pre-session start, then establish the
+# startup order Spider OS actually requires: Web core -> Web Assembly -> Webbie.
+systemctl --user reset-failed \
+  spider-os.service \
+  spider-web-assembly.service \
+  spider-ai-resident.service 2>/dev/null || true
+
+systemctl --user restart spider-os.service
+systemctl --user restart spider-web-assembly.service
+systemctl --user start spider-ai-resident.service
