@@ -14,13 +14,13 @@ permissions:
 
 jobs:
   cleanup:
-    name: Verify disposable CI storage cleanup
+    name: Finish Spider OS storage cleanup
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       DELETE_ITEMS: "false"
       PACKAGE_NAME: spider-os
-      RUN_TO_CANCEL: ""
+      RUN_TO_CANCEL: "33301317292"
     steps:
       - name: Inventory and clean disposable storage
         env:
