@@ -25,4 +25,5 @@ chmod 0755 \
 
 systemctl --global enable spider-os.service
 systemctl --global enable spider-ai-resident.service
+systemctl --global enable spider-web-assembly.service
 dnf5 clean all
