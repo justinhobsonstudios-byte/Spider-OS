@@ -21,7 +21,8 @@ chmod 0755 \
   /usr/bin/spider-os-open \
   /usr/bin/spider-os-first-login \
   /usr/bin/spider-hardware-report \
-  /usr/bin/spider-security-lab
+  /usr/bin/spider-security-lab \
+  /usr/libexec/spider-os-session-bootstrap
 
 systemctl --global enable spider-os.service
 systemctl --global enable spider-ai-resident.service
