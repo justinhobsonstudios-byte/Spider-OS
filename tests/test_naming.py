@@ -48,6 +48,17 @@ class NamingContractTests(unittest.TestCase):
         )
         self.assertNotIn("SPIDER_AI_WAKE_PHRASES", service)
 
+    def test_first_login_records_kde_session_before_one_time_guard(self):
+        root = Path(__file__).resolve().parents[1]
+        bootstrap = (
+            root / "system_files/usr/bin/spider-os-first-login"
+        ).read_text(encoding="utf-8")
+        session_write = ': > "$session_marker"'
+        one_time_guard = 'if [ -f "$marker" ]; then'
+        self.assertIn('session_marker="$config_root/session-opened"', bootstrap)
+        self.assertIn(session_write, bootstrap)
+        self.assertLess(bootstrap.index(session_write), bootstrap.index(one_time_guard))
+
     def test_legacy_life_space_wording_is_not_user_facing(self):
         root = Path(__file__).resolve().parents[1]
         checked = [

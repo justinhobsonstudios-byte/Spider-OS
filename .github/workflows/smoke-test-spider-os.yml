@@ -3,11 +3,6 @@ name: Smoke Test Spider OS ISO
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/smoke-test-spider-os.yml'
   workflow_run:
     workflows:
       - Build Spider OS ISO
@@ -21,12 +16,38 @@ permissions:
 jobs:
   boot-test:
     name: Boot Spider OS ISO in QEMU
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
+      - name: Decide whether smoke test applies
+        id: gate
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          SOURCE_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SOURCE_EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          set -euo pipefail
+          run_smoke=true
+          reason="manual smoke request"
+          if [ "$EVENT_NAME" = workflow_run ]; then
+            if [ "$SOURCE_CONCLUSION" != success ]; then
+              run_smoke=false
+              reason="source build concluded $SOURCE_CONCLUSION"
+            elif [ "$SOURCE_BRANCH" != main ] && [ "$SOURCE_EVENT" != workflow_dispatch ]; then
+              run_smoke=false
+              reason="source build came from $SOURCE_EVENT on $SOURCE_BRANCH and published no ISO artifact"
+            else
+              reason="successful ISO-producing source build"
+            fi
+          fi
+          echo "run=$run_smoke" >> "$GITHUB_OUTPUT"
+          echo "Smoke decision: $run_smoke ($reason)"
+
       - name: Free runner disk space
+        if: steps.gate.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -36,6 +57,7 @@ jobs:
           df -h /
 
       - name: Install VM tools
+        if: steps.gate.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -44,6 +66,7 @@ jobs:
           qemu-system-x86_64 --version
 
       - name: Resolve Spider OS ISO artifact
+        if: steps.gate.outputs.run == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,6 +89,7 @@ jobs:
           echo "ARTIFACT_DIGEST=$artifact_digest" >> "$GITHUB_ENV"
 
       - name: Download completed Spider OS ISO artifact
+        if: steps.gate.outputs.run == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,6 +107,7 @@ jobs:
           sha256sum "$iso_path"
 
       - name: Verify and diagnose installer media
+        if: steps.gate.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -104,6 +129,7 @@ jobs:
           cp "$RUNNER_TEMP/buildstamp-check/.buildstamp" "$evidence/buildstamp.txt"
 
       - name: Boot ISO and require installer progress
+        if: steps.gate.outputs.run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -154,7 +180,7 @@ PY
           echo 'Spider OS reached a visually complex installer display and remained running.'
 
       - name: Upload boot-test evidence
-        if: always()
+        if: ${{ always() && steps.gate.outputs.run == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-Boot-Test
@@ -168,4 +194,4 @@ PY
             iso/iso-files.txt
             iso/buildstamp.txt
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 1

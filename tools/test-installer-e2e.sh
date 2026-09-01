@@ -326,6 +326,51 @@ capture_session_diagnostics() {
   ' > "$target" 2>&1 || true
 }
 
+report_assembly_state() {
+  ssh "${ssh_args[@]}" 'set +e
+    report_file() {
+      if [ -f "$1" ]; then
+        echo "PASS: $2"
+      else
+        echo "FAIL: $2"
+      fi
+    }
+    report_service() {
+      if systemctl --user is-active --quiet "$1"; then
+        echo "PASS: $1 is active"
+      else
+        echo "FAIL: $1 is not active"
+      fi
+    }
+
+    echo "=== Web Assembly gate state ==="
+    report_file "$HOME/.config/spider-os/desktop-initialized" "desktop-initialized marker"
+    report_file "$HOME/.config/spider-os/session-opened" "session-opened marker"
+    report_service spider-os.service
+    report_service spider-ai-resident.service
+    if curl --fail --silent --max-time 3 http://127.0.0.1:8765/api/health >/dev/null; then
+      echo "PASS: Spider OS health endpoint is ready"
+    else
+      echo "FAIL: Spider OS health endpoint is unavailable"
+    fi
+
+    echo
+    echo "=== concise display/session state ==="
+    systemctl get-default
+    sudo systemctl --no-pager --full status display-manager
+    loginctl list-sessions
+    ps -ef | grep -E "[s]ddm|[k]win|[p]lasmashell|[s]tartplasma|[k]ded"
+
+    echo
+    echo "=== recent Spider OS user-service journal ==="
+    journalctl --user -b -u spider-os.service -u spider-ai-resident.service --no-pager -n 120
+
+    echo
+    echo "=== recent SDDM journal ==="
+    sudo journalctl -b -u sddm --no-pager -n 120
+  ' 2>&1 || true
+}
+
 boot_started="$SECONDS"
 ssh_ready=0
 while [ $((SECONDS - boot_started)) -lt "$first_login_timeout" ]; do
@@ -343,9 +388,16 @@ done
   capture_screen "$installed_monitor" "$evidence/installed-ssh-timeout.png"
   printf 'info status\n' | socat - "UNIX-CONNECT:$installed_monitor" \
     > "$evidence/installed-ssh-timeout-qemu-status.txt" 2>&1 || true
-  echo "Installed Spider OS never became reachable over SSH." >&2
+  echo "::error title=Installed OS SSH timeout::Spider OS booted from disk but never became reachable over SSH." >&2
+  echo "::group::Installed VM serial tail"
+  tail -n 200 "$installed_serial" || true
+  echo "::endgroup::"
+  echo "::group::QEMU status at SSH timeout"
+  cat "$evidence/installed-ssh-timeout-qemu-status.txt" || true
+  echo "::endgroup::"
   exit 1
 }
+echo "Installed Spider OS is reachable over SSH."
 
 assembly_ready=0
 while [ $((SECONDS - boot_started)) -lt "$first_login_timeout" ]; do
@@ -362,9 +414,19 @@ done
 [ "$assembly_ready" -eq 1 ] || {
   capture_screen "$installed_monitor" "$evidence/web-assembly-timeout.png"
   capture_session_diagnostics "$evidence/web-assembly-diagnostics.txt"
-  echo "Installed Spider OS booted, but Web Assembly did not complete." >&2
+  echo "::error title=Web Assembly gate failed::Installed Spider OS booted, but one or more KDE, service, marker, or health checks did not become ready." >&2
+  echo "::group::Web Assembly gate state"
+  report_assembly_state
+  echo "::endgroup::"
+  echo "::group::Full Web Assembly diagnostics"
+  cat "$evidence/web-assembly-diagnostics.txt" || true
+  echo "::endgroup::"
+  echo "::group::Installed VM serial tail"
+  tail -n 200 "$installed_serial" || true
+  echo "::endgroup::"
   exit 1
 }
+echo "KDE session markers and the Spider OS health endpoint are ready."
 
 ssh "${ssh_args[@]}" '
   set -eu
@@ -372,6 +434,8 @@ ssh "${ssh_args[@]}" '
   test -s /etc/spider-ci-session
   test -x /usr/bin/spider-os
   test -x /usr/bin/spider-os-first-login
+  test -f "$HOME/.config/spider-os/desktop-initialized"
+  test -f "$HOME/.config/spider-os/session-opened"
   systemctl --user is-active spider-os.service
   systemctl --user is-active spider-ai-resident.service
   curl --fail --silent --max-time 3 http://127.0.0.1:8765/api/health
