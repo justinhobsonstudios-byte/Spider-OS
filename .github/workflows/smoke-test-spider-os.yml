@@ -30,7 +30,7 @@ jobs:
             system_files/usr/share/wallpapers/SpiderOS/metadata.json
             system_files/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
           )
-          for path in "${{ github.workspace }}/${required[@]}"; do
+          for path in "${required[@]}"; do
             test -e "$path"
           done
           bash -n build_files/build.sh
