@@ -61,9 +61,11 @@ EOF
 initrd="$workdir/initrd.img"
 xorriso -osirrox on -indev "$input_iso" \
   -extract /images/pxeboot/initrd.img "$initrd" >/dev/null 2>&1
+test -s "$initrd"
 
 cpio_archive="$workdir/initrd.cpio"
 xz -dc "$initrd" > "$cpio_archive"
+test -s "$cpio_archive"
 (
   cd "$workdir/stamp"
   printf '.buildstamp\0' | cpio --null -o -H newc -A -F "$cpio_archive" >/dev/null 2>&1
@@ -71,6 +73,7 @@ xz -dc "$initrd" > "$cpio_archive"
 
 repaired_initrd="$workdir/initrd-repaired.img"
 xz --check=crc32 -9e -c "$cpio_archive" > "$repaired_initrd"
+test -s "$repaired_initrd"
 xz -dc "$repaired_initrd" | cpio -it --quiet | grep -Fx '.buildstamp' >/dev/null
 
 # If the builder happens to expose GRUB configs in the ISO filesystem, rebrand
@@ -129,6 +132,7 @@ grep -Eq 'UEFI[[:space:]]+y' "$workdir/output-el-torito.txt"
 verify_initrd="$workdir/verify-initrd.img"
 xorriso -osirrox on -indev "$output_iso" \
   -extract /images/pxeboot/initrd.img "$verify_initrd" >/dev/null 2>&1
+test -s "$verify_initrd"
 mkdir -p "$workdir/verify-stamp"
 (
   cd "$workdir/verify-stamp"
@@ -136,6 +140,12 @@ mkdir -p "$workdir/verify-stamp"
 )
 grep -Fq 'Product = Spider OS' "$workdir/verify-stamp/.buildstamp"
 grep -Fq 'Version = 0.7.0' "$workdir/verify-stamp/.buildstamp"
+
+root_buildstamp="$workdir/root-buildstamp"
+xorriso -osirrox on -indev "$output_iso" -extract /.buildstamp "$root_buildstamp" >/dev/null 2>&1
+test -s "$root_buildstamp"
+grep -Fq 'Product = Spider OS' "$root_buildstamp"
+grep -Fq 'Version = 0.7.0' "$root_buildstamp"
 
 if [ "$patched_menu" -eq 1 ]; then
   echo "Spider OS installer ISO repaired; outer GRUB menu branding updated."
