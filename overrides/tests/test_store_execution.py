@@ -47,6 +47,29 @@ class SpiderStoreExecutionTests(unittest.TestCase):
 
     @patch("spider_os.store.shutil.which", return_value="/usr/bin/flatpak")
     @patch("spider_os.store._run")
+    def test_snapshot_reads_only_the_user_installation(self, run, _which) -> None:
+        run.side_effect = [
+            (0, "org.example.App\tExample\t1.0\tstable", ""),
+            (0, "flathub\thttps://dl.flathub.org/repo/\t", ""),
+        ]
+
+        snapshot = SpiderStore().snapshot()
+
+        self.assertTrue(snapshot["available"])
+        self.assertEqual(
+            run.call_args_list[0].args[0],
+            [
+                "flatpak", "list", "--user", "--app",
+                "--columns=application,name,version,branch",
+            ],
+        )
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ["flatpak", "remotes", "--user", "--columns=name,url,filter"],
+        )
+
+    @patch("spider_os.store.shutil.which", return_value="/usr/bin/flatpak")
+    @patch("spider_os.store._run")
     def test_install_configures_user_flathub_then_executes_exact_plan(self, run, _which) -> None:
         run.side_effect = [(0, "", ""), (0, "installed", "")]
         result = SpiderStore.execute("install", "org.example.App")
