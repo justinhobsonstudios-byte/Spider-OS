@@ -24,7 +24,9 @@ chmod 0755 \
   /usr/bin/spider-security-lab \
   /usr/libexec/spider-os-session-bootstrap
 
+# The Web core and Webbie are ordinary user services. KDE owns session assembly
+# through one autostart bridge; do not create a second systemd assembly path.
 systemctl --global enable spider-os.service
 systemctl --global enable spider-ai-resident.service
-systemctl --global enable spider-web-assembly.service
+
 dnf5 clean all
