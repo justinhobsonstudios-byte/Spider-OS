@@ -87,7 +87,7 @@ KICKSTART
 
 python3 -m http.server 18080 --bind 0.0.0.0 --directory "$workdir/kickstart"   > "$evidence/kickstart-http.log" 2>&1 &
 http_pid="$!"
-curl --retry 10 --retry-delay 1 --fail --silent   http://127.0.0.1:18080/spider-ci.ks >/dev/null
+curl --retry 10 --retry-delay 1 --retry-connrefused --fail --silent   http://127.0.0.1:18080/spider-ci.ks >/dev/null
 
 accel=(-accel 'tcg,thread=multi' -cpu max)
 install_timeout=7200
