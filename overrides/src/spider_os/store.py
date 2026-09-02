@@ -48,9 +48,9 @@ class SpiderStore:
                 "policy": self.policy(),
             }
         _, installed, _ = _run(
-            ["flatpak", "list", "--app", "--columns=application,name,version,branch"]
+            ["flatpak", "list", "--user", "--app", "--columns=application,name,version,branch"]
         )
-        _, remotes, _ = _run(["flatpak", "remotes", "--columns=name,url,filter"])
+        _, remotes, _ = _run(["flatpak", "remotes", "--user", "--columns=name,url,filter"])
         return {
             "name": self.name,
             "available": True,
