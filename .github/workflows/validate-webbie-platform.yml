@@ -1,0 +1,98 @@
+---
+name: Validate Webbie Platform
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'overrides/**'
+      - 'tools/apply-source-overrides.sh'
+      - '.github/workflows/validate-webbie-platform.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'overrides/**'
+      - 'tools/apply-source-overrides.sh'
+      - '.github/workflows/validate-webbie-platform.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Rehydrate structured source
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/source"
+          mkdir -p "$root"
+          unzip -q Spider_OS_v0.7_GitHub_ISO_Ready.zip -d "$root"
+          project_root=""
+          while IFS= read -r containerfile; do
+            candidate="$(dirname "$containerfile")"
+            if [ -d "$candidate/src/spider_os" ] && [ -d "$candidate/system_files" ] && [ -d "$candidate/build_files" ]; then
+              project_root="$candidate"
+              break
+            fi
+          done < <(find "$root" -name Containerfile -type f -print)
+          test -n "$project_root"
+          chmod +x tools/apply-source-overrides.sh
+          tools/apply-source-overrides.sh "$GITHUB_WORKSPACE" "$project_root"
+          echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
+
+      - name: Validate Python and shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q "$PROJECT_ROOT/src/spider_os"
+          while IFS= read -r script; do bash -n "$script"; done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
+          bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-os-first-login"
+          bash -n "$PROJECT_ROOT/system_files/usr/bin/spider-webbie-resident"
+
+      - name: Run source tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user pytest
+          cd "$PROJECT_ROOT"
+          python3 -m pytest -q
+
+      - name: Exercise Web platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PROJECT_ROOT/src"
+          export SPIDER_OS_DATA_DIR="$RUNNER_TEMP/spider-data"
+          python3 -m spider_os assembly > "$RUNNER_TEMP/assembly.json"
+          python3 -m spider_os devices > "$RUNNER_TEMP/devices.json"
+          python3 -m spider_os mode studio > "$RUNNER_TEMP/mode.json"
+          python3 -m spider_os system > "$RUNNER_TEMP/system.json"
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          load = lambda name: json.loads((root / name).read_text())
+          assembly = load("assembly.json")
+          devices = load("devices.json")
+          mode = load("mode.json")
+          system = load("system.json")
+
+          assert assembly["name"] == "Web Assembly", assembly
+          assert assembly["resident_ai"] == "Webbie", assembly
+          assert devices["name"] == "Device Web", devices
+          assert mode["mode"] == "studio", mode
+          assert mode["address_name"] == "Justin", mode
+          assert system["name"] == "Spider Control Center", system
+          assert system["updates"]["default_channel"] == "stable", system
+          assert system["recovery"]["atomic_rollback"] is True, system
+          print("Web platform integration contracts passed")
+          PY

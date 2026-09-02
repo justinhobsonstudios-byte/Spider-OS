@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+setup_file="${SPIDER_OS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/spider-os}/setup.json"
+if [ -f "$setup_file" ]; then
+  eval "$(python3 - "$setup_file" <<'PY'
+import json, shlex, sys
+try:
+    data=json.load(open(sys.argv[1], encoding='utf-8'))
+except Exception:
+    data={}
+values={
+ 'SPIDER_OS_VOICE_ENABLED':'1' if data.get('voice_enabled', True) else '0',
+ 'SPIDER_OS_SCREEN_AWARENESS':'1' if data.get('screen_awareness', True) else '0',
+ 'SPIDER_OS_LEARN_USER':'1' if data.get('learn_user', True) else '0',
+ 'SPIDER_OS_LEARN_STUDIES':'1' if data.get('learn_studies', True) else '0',
+ 'SPIDER_OS_LEARN_INTERNET':'1' if data.get('learn_internet', True) else '0',
+ 'SPIDER_OS_PROACTIVE_LEVEL':str(data.get('proactive_level','very-high')),
+}
+for key, value in values.items():
+    print(f'export {key}={shlex.quote(value)}')
+PY
+)"
+fi
+
+export SPIDER_OS_WAKE_PHRASES="${SPIDER_OS_WAKE_PHRASES:-Hey Webbie,Webbie,Hey Web,Web}"
+export SPIDER_OS_PROACTIVE="${SPIDER_OS_PROACTIVE:-1}"
+export SPIDER_OS_SCREEN_ARCHIVE="${SPIDER_OS_SCREEN_ARCHIVE:-0}"
+export SPIDER_OS_MEMORY_LEARNING="${SPIDER_OS_MEMORY_LEARNING:-continuous-transparent}"
+exec /usr/bin/spider-os resident --interval 5
