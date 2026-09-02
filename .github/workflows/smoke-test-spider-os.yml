@@ -36,7 +36,8 @@ jobs:
           bash -n build_files/build.sh
           bash -n tools/repair-installer-iso.sh
           bash -n tools/test-minimal-installer-e2e.sh
-          grep -Fq 'systemctl set-default graphical.target' build_files/build.sh
+          grep -Fq 'ln -sfn graphical.target /usr/lib/systemd/system/default.target' build_files/build.sh
+          grep -Fq 'rm -f /etc/systemd/system/default.target' build_files/build.sh
           grep -Fq 'systemctl enable plasmalogin.service' build_files/build.sh
           if grep -Eiq 'webbie|web assembly|spider-os\.service|spider-ai-resident'             Containerfile build_files/build.sh tools/test-minimal-installer-e2e.sh; then
             echo "Milestone 1 must not depend on application or Web Assembly services." >&2
