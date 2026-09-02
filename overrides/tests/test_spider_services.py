@@ -27,7 +27,9 @@ class SpiderServicePolicyTests(unittest.TestCase):
         plan = SpiderStore.action_plan("install", "org.example.App")
         self.assertTrue(plan["requires_approval"])
         self.assertFalse(plan["executes"])
-        self.assertEqual(plan["command"][:3], ["flatpak", "install", "flathub"])
+        self.assertEqual(plan["scope"], "user")
+        self.assertFalse(plan["arbitrary_command"])
+        self.assertEqual(plan["command"][:3], ["flatpak", "install", "--user"])
 
     def test_vault_never_places_secret_values_in_spider_state(self) -> None:
         policy = SpiderVault.policy()
@@ -177,6 +179,7 @@ class SpiderServiceApiTests(unittest.TestCase):
         )["plan"]
         self.assertTrue(result["requires_approval"])
         self.assertFalse(result["executes"])
+        self.assertEqual(result["scope"], "user")
 
     def test_sync_configuration_endpoint_requires_verified_encryption(self) -> None:
         token = self.get_json("/api/bootstrap")["csrf_token"]

@@ -153,6 +153,7 @@ def install_server_extensions() -> None:
                     "/api/mode",
                     "/api/system/plan",
                     "/api/store/plan",
+                    "/api/store/execute",
                     "/api/vault/plan",
                     "/api/sync/configure",
                     "/api/sync/plan",
@@ -186,6 +187,19 @@ def install_server_extensions() -> None:
                             {"plan": SpiderStore().action_plan(
                                 str(payload.get("action", "")),
                                 str(payload.get("app_id", "")),
+                                str(payload.get("remote", "flathub")),
+                            )},
+                        )
+                    elif parsed.path == "/api/store/execute":
+                        app_id = str(payload.get("app_id", ""))
+                        confirmation = str(payload.get("confirmation", ""))
+                        if confirmation != app_id:
+                            raise ValueError("Store execution requires exact application-id confirmation")
+                        self._json(
+                            HTTPStatus.OK,
+                            {"result": SpiderStore().execute(
+                                str(payload.get("action", "")),
+                                app_id,
                                 str(payload.get("remote", "flathub")),
                             )},
                         )
@@ -231,6 +245,8 @@ def install_server_extensions() -> None:
                         )
                 except (TypeError, ValueError) as error:
                     self._json_error(HTTPStatus.BAD_REQUEST, str(error))
+                except RuntimeError as error:
+                    self._json_error(HTTPStatus.CONFLICT, str(error))
                 except Exception as error:
                     self._server_error(error)
 

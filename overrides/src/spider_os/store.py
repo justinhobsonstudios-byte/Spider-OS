@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from typing import Any
+
+
+FLATHUB_URL = "https://dl.flathub.org/repo/flathub.flatpakrepo"
+APP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*(?:\.[A-Za-z0-9][A-Za-z0-9_-]*){2,}$")
+REMOTE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
 def _run(command: list[str], timeout: float = 8.0) -> tuple[int, str, str]:
@@ -22,11 +28,11 @@ def _run(command: list[str], timeout: float = 8.0) -> tuple[int, str, str]:
 
 
 class SpiderStore:
-    """Flatpak-first application catalog for Spider OS.
+    """Flatpak-first application catalog and user-scoped installer.
 
-    Discovery is read-only. Install, remove and update requests are emitted as
-    approval plans so The Web never turns a store click into an invisible root or
-    package-manager mutation.
+    Spider Store never mutates the atomic host package set. Explicit execution uses
+    Flatpak's per-user installation so applications live under the user's Flatpak
+    installation rather than modifying the Spider OS bootc image.
     """
 
     name = "Spider Store"
@@ -42,9 +48,9 @@ class SpiderStore:
                 "policy": self.policy(),
             }
         _, installed, _ = _run(
-            ["flatpak", "list", "--app", "--columns=application,name,version,branch"]
+            ["flatpak", "list", "--user", "--app", "--columns=application,name,version,branch"]
         )
-        _, remotes, _ = _run(["flatpak", "remotes", "--columns=name,url,filter"])
+        _, remotes, _ = _run(["flatpak", "remotes", "--user", "--columns=name,url,filter"])
         return {
             "name": self.name,
             "available": True,
@@ -57,6 +63,8 @@ class SpiderStore:
         query = query.strip()
         if not query:
             raise ValueError("store search requires a query")
+        if len(query) > 200 or any(ord(char) < 32 for char in query):
+            raise ValueError("invalid store search query")
         if not shutil.which("flatpak"):
             return {"name": self.name, "query": query, "results": [], "available": False}
         code, output, error = _run(
@@ -88,30 +96,87 @@ class SpiderStore:
         return {
             "format_priority": ["flatpak", "web-app", "container"],
             "host_packages": "image-build-only",
+            "flatpak_scope": "user",
             "automatic_install": False,
             "approval_required": True,
+            "arbitrary_command": False,
         }
 
-    @staticmethod
-    def action_plan(action: str, app_id: str = "", remote: str = "flathub") -> dict[str, Any]:
-        app_id = app_id.strip()
+    @classmethod
+    def action_plan(cls, action: str, app_id: str = "", remote: str = "flathub") -> dict[str, Any]:
+        app_id = cls._validate_app_id(app_id)
+        remote = cls._validate_remote(remote)
         plans = {
-            "install": ["flatpak", "install", remote or "flathub", app_id],
-            "remove": ["flatpak", "uninstall", app_id],
-            "update": ["flatpak", "update", app_id],
+            "install": [
+                "flatpak", "install", "--user", "--noninteractive", "--assumeyes", remote, app_id,
+            ],
+            "remove": [
+                "flatpak", "uninstall", "--user", "--noninteractive", "--assumeyes", app_id,
+            ],
+            "update": [
+                "flatpak", "update", "--user", "--noninteractive", "--assumeyes", app_id,
+            ],
         }
         if action not in plans:
             raise ValueError("unknown store action")
-        if not app_id:
-            raise ValueError("an application id is required")
         return {
             "action": action,
             "app_id": app_id,
+            "remote": remote,
             "tier": "sensitive",
             "requires_approval": True,
             "command": plans[action],
+            "scope": "user",
             "executes": False,
+            "arbitrary_command": False,
         }
+
+    @classmethod
+    def execute(cls, action: str, app_id: str, remote: str = "flathub") -> dict[str, Any]:
+        plan = cls.action_plan(action, app_id, remote)
+        if not shutil.which("flatpak"):
+            raise RuntimeError("Flatpak is not installed")
+
+        # Spider Store's execution surface is intentionally limited to the stable
+        # Flathub remote. Other remotes may be searched/read but require manual setup.
+        if action == "install" and plan["remote"] != "flathub":
+            raise ValueError("automatic Store installs currently support only Flathub")
+        if action == "install":
+            code, _, error = _run(
+                [
+                    "flatpak", "remote-add", "--user", "--if-not-exists",
+                    "flathub", FLATHUB_URL,
+                ],
+                timeout=60.0,
+            )
+            if code != 0:
+                raise RuntimeError(error or "could not configure the user Flathub remote")
+
+        code, output, error = _run(plan["command"], timeout=1800.0)
+        if code != 0:
+            raise RuntimeError((error or output or "Flatpak action failed")[:1000])
+        return {
+            "action": action,
+            "app_id": plan["app_id"],
+            "scope": "user",
+            "executed": True,
+            "exit_code": code,
+            "output": output[:4000],
+        }
+
+    @staticmethod
+    def _validate_app_id(value: str) -> str:
+        app_id = value.strip()
+        if len(app_id) > 255 or not APP_ID_RE.fullmatch(app_id):
+            raise ValueError("invalid Flatpak application id")
+        return app_id
+
+    @staticmethod
+    def _validate_remote(value: str) -> str:
+        remote = (value or "flathub").strip()
+        if not REMOTE_RE.fullmatch(remote):
+            raise ValueError("invalid Flatpak remote name")
+        return remote
 
     @staticmethod
     def _rows(output: str) -> list[list[str]]:
