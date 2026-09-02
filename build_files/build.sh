@@ -2,8 +2,8 @@
 set -ouex pipefail
 
 # Keep milestone 1 deliberately small: use Aurora's shipped KDE stack and add
-# only Spider OS branding. Application services and Web Assembly return after
-# the installed graphical system has proved itself.
+# only Spider OS branding. The application stack returns after the installed
+# graphical system has proved itself.
 cp -avf /ctx/system_files/. /
 
 systemctl set-default graphical.target
