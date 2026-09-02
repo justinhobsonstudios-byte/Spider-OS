@@ -1,35 +1,25 @@
 ---
-name: Build Spider OS ISO
+name: Test minimal Spider OS installer
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - 'Containerfile'
-      - 'build-image.sh'
-      - 'build-iso.sh'
+      - Containerfile
       - 'build_files/**'
       - 'system_files/**'
-      - 'src/**'
       - 'disk_config/**'
       - 'tools/**'
-      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - 'Containerfile'
-      - 'build-image.sh'
-      - 'build-iso.sh'
+      - Containerfile
       - 'build_files/**'
       - 'system_files/**'
-      - 'src/**'
       - 'disk_config/**'
       - 'tools/**'
-      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
 
 permissions:
@@ -37,136 +27,61 @@ permissions:
   packages: write
 
 concurrency:
-  group: spider-os-iso-${{ github.ref }}
+  group: minimal-installer-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-iso:
-    name: Build bootable installer
+  installer-e2e:
+    name: Install, reboot, reach KDE login
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
-
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Ensure build tools
+      - name: Install host tools
         shell: bash
         run: |
           set -euo pipefail
-          missing=0
-          for command in podman unzip xorriso cpio xz; do
-            command -v "$command" >/dev/null 2>&1 || missing=1
-          done
-          if [ "$missing" -eq 1 ]; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends \
-              podman \
-              unzip \
-              xorriso \
-              cpio \
-              xz-utils
-          fi
-          podman --version
-          xorriso -version | head -n 1
-
-      - name: Select Spider OS source tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          project_root="$GITHUB_WORKSPACE"
-          if [ ! -d "$project_root/build_files" ] || \
-             [ ! -d "$project_root/system_files" ] || \
-             [ ! -d "$project_root/src/spider_os" ]; then
-            archive="$GITHUB_WORKSPACE/Spider_OS_v0.7_GitHub_ISO_Ready.zip"
-            if [ ! -f "$archive" ]; then
-              echo "Required source folders are missing and the ISO-ready source archive was not found." >&2
-              exit 1
-            fi
-            extract_root="$RUNNER_TEMP/spider-os-source"
-            rm -rf "$extract_root"
-            mkdir -p "$extract_root"
-            unzip -q "$archive" -d "$extract_root"
-            project_root=""
-            while IFS= read -r containerfile; do
-              candidate="$(dirname "$containerfile")"
-              if [ -d "$candidate/build_files" ] && \
-                 [ -d "$candidate/system_files" ] && \
-                 [ -d "$candidate/src/spider_os" ]; then
-                project_root="$candidate"
-                break
-              fi
-            done < <(find "$extract_root" -type f -name Containerfile -print)
-            if [ -z "$project_root" ]; then
-              echo "Could not find a complete Spider OS image-template tree inside the archive." >&2
-              find "$extract_root" -maxdepth 3 -type f -print | sort | head -n 200 >&2
-              exit 1
-            fi
-          fi
-          echo "Using Spider OS source tree: $project_root"
-          echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
-
-      - name: Validate source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "$GITHUB_WORKSPACE/Containerfile"
-          test -f "$GITHUB_WORKSPACE/disk_config/iso-kde.toml"
-          test -f "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
-          test -d "$PROJECT_ROOT/build_files"
-          test -d "$PROJECT_ROOT/system_files"
-          test -d "$PROJECT_ROOT/src/spider_os"
-          bash -n "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
-          while IFS= read -r script; do
-            bash -n "$script"
-          done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
-          python3 -m compileall -q "$PROJECT_ROOT/src/spider_os"
-
-      - name: Free runner disk space
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Disk space before cleanup:"
-          df -h /
-          sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL || true
-          sudo docker image prune --all --force >/dev/null 2>&1 || true
-          echo "Disk space after cleanup:"
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends             podman xorriso cpio xz-utils qemu-system-x86 qemu-utils socat             imagemagick openssh-client openssl
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc             /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
           df -h /
 
-      - name: Build Spider OS bootc image
+      - name: Validate production inputs
         shell: bash
-        env:
-          SPIDER_BASE_IMAGE: ghcr.io/ublue-os/aurora:stable
         run: |
           set -euo pipefail
-          sudo podman build \
-            --pull=newer \
-            --build-arg "BASE_IMAGE=$SPIDER_BASE_IMAGE" \
-            --file "$GITHUB_WORKSPACE/Containerfile" \
-            --tag localhost/spider-os:latest \
-            "$PROJECT_ROOT"
-          sudo podman run --rm localhost/spider-os:latest bootc container lint
+          test -f Containerfile
+          test -f build_files/build.sh
+          test -f disk_config/iso-kde.toml
+          test -f tools/repair-installer-iso.sh
+          test -f tools/test-minimal-installer-e2e.sh
+          bash -n build_files/build.sh
+          bash -n tools/repair-installer-iso.sh
+          bash -n tools/test-minimal-installer-e2e.sh
 
-      - name: Publish image for ISO builder
+      - name: Build bootc image
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo podman build --pull=newer             --build-arg BASE_IMAGE=ghcr.io/ublue-os/aurora:stable             --file Containerfile             --tag localhost/spider-os-minimal:latest .
+          sudo podman run --rm localhost/spider-os-minimal:latest bootc container lint
+
+      - name: Publish ephemeral image
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
-          image_ref="$registry/spider-os:ci-${GITHUB_SHA}"
-          printf '%s' "$GH_TOKEN" | sudo podman login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          sudo podman push localhost/spider-os:latest "$image_ref"
+          image_ref="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/spider-os:minimal-${GITHUB_SHA}"
+          printf '%s' "$GH_TOKEN" | sudo podman login ghcr.io             --username "$GITHUB_ACTOR" --password-stdin
+          sudo podman push localhost/spider-os-minimal:latest "$image_ref"
           echo "SPIDER_IMAGE=$image_ref" >> "$GITHUB_ENV"
           echo "RUNNER_UID=$(id -u)" >> "$GITHUB_ENV"
           echo "RUNNER_GID=$(id -g)" >> "$GITHUB_ENV"
 
-      - name: Build installer ISO
+      - name: Build production installer ISO
         id: build-iso
         uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d
         with:
@@ -178,7 +93,7 @@ jobs:
           types: anaconda-iso
           additional-args: --use-librepo=True
 
-      - name: Repair Spider OS installer metadata
+      - name: Repair installer metadata
         shell: bash
         env:
           BUILT_ISO: ${{ steps.build-iso.outputs.anaconda-iso-output-path }}
@@ -188,32 +103,75 @@ jobs:
           if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
             iso_path="$(find "$GITHUB_WORKSPACE/output" -type f -name '*.iso' -print -quit)"
           fi
-          if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
-            echo "bootc-image-builder completed without producing an ISO." >&2
-            find "$GITHUB_WORKSPACE/output" -maxdepth 4 -type f -print >&2 || true
-            exit 1
-          fi
-          chmod +x "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
-          "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh" \
-            "$iso_path" \
-            "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
+          test -n "$iso_path"
+          test -f "$iso_path"
+          chmod +x tools/repair-installer-iso.sh
+          tools/repair-installer-iso.sh "$iso_path" Spider_OS_x86_64.iso
 
-      - name: Prepare ISO artifact
+      - name: Install to blank disk and verify KDE login
+        id: gate
+        timeout-minutes: 130
         shell: bash
         run: |
           set -euo pipefail
-          cd "$GITHUB_WORKSPACE"
-          test -f Spider_OS_x86_64.iso
-          sha256sum Spider_OS_x86_64.iso > Spider_OS_x86_64.iso.sha256
-          ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
+          chmod +x tools/test-minimal-installer-e2e.sh
+          tools/test-minimal-installer-e2e.sh             Spider_OS_x86_64.iso iso-e2e-evidence
 
-      - name: Upload Spider OS ISO
+      - name: Summarize gate
+        if: always()
+        shell: bash
+        env:
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+        run: |
+          {
+            echo "## Minimal installer gate"
+            echo
+            echo "- Outcome: **$GATE_OUTCOME**"
+            echo "- Required: real install, disk-only reboot, graphical.target, Plasma Login Manager"
+            echo "- Excluded: Spider services, Webbie, Web Assembly"
+            if [ -s iso-e2e-evidence/installed-verification.txt ]; then
+              echo
+              echo '~~~text'
+              tail -n 120 iso-e2e-evidence/installed-verification.txt
+              echo '~~~'
+            elif [ -s iso-e2e-evidence/installed-diagnostics.txt ]; then
+              echo
+              echo '~~~text'
+              tail -n 160 iso-e2e-evidence/installed-diagnostics.txt
+              echo '~~~'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compact failure evidence
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: minimal-installer-failure
+          path: iso-e2e-evidence/
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Upload verified ISO
+        if: ${{ steps.gate.outcome == 'success' && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-ISO
-          path: |
-            Spider_OS_x86_64.iso
-            Spider_OS_x86_64.iso.sha256
-          if-no-files-found: error
+          path: Spider_OS_x86_64.iso
           compression-level: 0
-          retention-days: 14
+          retention-days: 1
+
+      - name: Remove ephemeral image
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="$GITHUB_REPOSITORY_OWNER"
+          tag="minimal-${GITHUB_SHA}"
+          version_id="$(gh api --paginate             "/users/$owner/packages/container/spider-os/versions?per_page=100"             --jq ".[] | select((.metadata.container.tags // []) | index(\"$tag\")) | .id"             | head -n 1)"
+          if [ -n "$version_id" ]; then
+            gh api --method DELETE               "/users/$owner/packages/container/spider-os/versions/$version_id"
+          fi

@@ -1,263 +1,44 @@
 ---
-name: Smoke Test Spider OS ISO
+name: Validate minimal installer source
 
 on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - Build Spider OS ISO
-    types:
-      - completed
 
 permissions:
-  actions: read
   contents: read
 
 jobs:
-  boot-test:
-    name: Boot Spider OS ISO in QEMU
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+  validate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
-
+    timeout-minutes: 10
     steps:
-      - name: Free runner disk space
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Enforce the milestone 1 boundary
         shell: bash
         run: |
           set -euo pipefail
-          echo "Before cleanup:"
-          df -h /
-          sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /usr/local/.ghcup \
-            /opt/hostedtoolcache/CodeQL || true
-          sudo docker image prune --all --force >/dev/null 2>&1 || true
-          echo "After cleanup:"
-          df -h /
-
-      - name: Install VM tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            qemu-system-x86 \
-            qemu-utils \
-            socat \
-            imagemagick \
-            xorriso \
-            cpio \
-            xz-utils \
-            unzip
-          qemu-system-x86_64 --version
-
-      - name: Resolve Spider OS ISO artifact
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_NAME: ${{ github.event_name }}
-          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
-        run: |
-          set -euo pipefail
-          api_headers=(
-            -H "Authorization: Bearer $GH_TOKEN"
-            -H "Accept: application/vnd.github+json"
-            -H "X-GitHub-Api-Version: 2022-11-28"
+          required=(
+            Containerfile
+            build_files/build.sh
+            disk_config/iso-kde.toml
+            tools/repair-installer-iso.sh
+            tools/test-minimal-installer-e2e.sh
+            system_files/usr/share/wallpapers/SpiderOS/metadata.json
+            system_files/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
           )
-
-          source_run="$WORKFLOW_RUN_ID"
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            source_run="$(curl --fail --silent --location "${api_headers[@]}" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/build-spider-os-iso.yml/runs?branch=main&status=success&per_page=1" \
-              | jq -r '.workflow_runs[0].id // empty')"
-          fi
-
-          if [ -z "$source_run" ]; then
-            echo "Could not resolve a successful Spider OS ISO workflow run." >&2
-            exit 1
-          fi
-
-          artifact_json="$(curl --fail --silent --location "${api_headers[@]}" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$source_run/artifacts?name=Spider-OS-ISO&per_page=100")"
-          artifact_id="$(jq -r '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id // empty' <<<"$artifact_json")"
-          artifact_digest="$(jq -r '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .digest // empty' <<<"$artifact_json")"
-
-          if [ -z "$artifact_id" ]; then
-            echo "No non-expired Spider-OS-ISO artifact found for workflow run $source_run." >&2
-            exit 1
-          fi
-
-          echo "SOURCE_RUN_ID=$source_run" >> "$GITHUB_ENV"
-          echo "ARTIFACT_ID=$artifact_id" >> "$GITHUB_ENV"
-          echo "ARTIFACT_DIGEST=$artifact_digest" >> "$GITHUB_ENV"
-          echo "Testing Spider-OS-ISO artifact $artifact_id from workflow run $source_run"
-
-      - name: Download completed Spider OS ISO artifact
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          archive="$RUNNER_TEMP/Spider-OS-ISO.zip"
-          mkdir -p "$GITHUB_WORKSPACE/iso"
-          curl --fail --location --retry 3 --retry-delay 2 \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
-            --output "$archive"
-
-          if [[ "$ARTIFACT_DIGEST" == sha256:* ]]; then
-            expected="${ARTIFACT_DIGEST#sha256:}"
-            echo "$expected  $archive" | sha256sum --check
-          fi
-
-          unzip -q "$archive" -d "$GITHUB_WORKSPACE/iso"
-          rm -f "$archive"
-          iso_path="$(find "$GITHUB_WORKSPACE/iso" -type f -name '*.iso' -print -quit)"
-          if [ -z "$iso_path" ] || [ ! -f "$iso_path" ]; then
-            echo "No ISO found in artifact." >&2
-            exit 1
-          fi
-          echo "ISO_PATH=$iso_path" >> "$GITHUB_ENV"
-          ls -lh "$iso_path"
-          sha256sum "$iso_path"
-          df -h /
-
-      - name: Verify Spider OS installer identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          xorriso -indev "$ISO_PATH" -report_el_torito plain 2>&1 | tee "$RUNNER_TEMP/el-torito.txt"
-          grep -Eq 'BIOS[[:space:]]+y' "$RUNNER_TEMP/el-torito.txt"
-          grep -Eq 'UEFI[[:space:]]+y' "$RUNNER_TEMP/el-torito.txt"
-
-          xorriso -indev "$ISO_PATH" -pvd_info 2>&1 | tee "$RUNNER_TEMP/pvd.txt"
-          grep -Fq "Volume id    : 'SPIDER_OS'" "$RUNNER_TEMP/pvd.txt"
-
-          # Some bootc-image-builder ISOs expose grub.cfg in the ISO tree and
-          # others keep the active configuration inside an EFI El Torito image.
-          # Either layout is valid. If outer configs exist, inspect them; never
-          # fail a bootable ISO merely because the boot config is embedded.
-          mapfile -t grub_paths < <(
-            xorriso -indev "$ISO_PATH" -find / -type f -name grub.cfg -print 2>/dev/null
-          )
-          if [ "${#grub_paths[@]}" -eq 0 ]; then
-            echo "No outer grub.cfg found; boot configuration is embedded in the boot image."
-          else
-            index=0
-            for iso_path in "${grub_paths[@]}"; do
-              index=$((index + 1))
-              cfg="$RUNNER_TEMP/grub-${index}.cfg"
-              xorriso -osirrox on -indev "$ISO_PATH" -extract "$iso_path" "$cfg" >/dev/null 2>&1
-              echo "Inspected outer GRUB configuration: $iso_path"
-            done
-          fi
-
-          initrd="$RUNNER_TEMP/initrd.img"
-          xorriso -osirrox on -indev "$ISO_PATH" \
-            -extract /images/pxeboot/initrd.img "$initrd" >/dev/null 2>&1
-          mkdir -p "$RUNNER_TEMP/buildstamp-check"
-          (
-            cd "$RUNNER_TEMP/buildstamp-check"
-            xz -dc "$initrd" | cpio -id --quiet '.buildstamp'
-          )
-          test -f "$RUNNER_TEMP/buildstamp-check/.buildstamp"
-          grep -Fq 'Product = Spider OS' "$RUNNER_TEMP/buildstamp-check/.buildstamp"
-          grep -Fq 'Version = 0.7.0' "$RUNNER_TEMP/buildstamp-check/.buildstamp"
-
-      - name: Boot ISO and capture virtual display
-        shell: bash
-        run: |
-          set -euo pipefail
-          disk="$RUNNER_TEMP/spider-test.qcow2"
-          monitor="$RUNNER_TEMP/qemu-monitor.sock"
-          serial="$GITHUB_WORKSPACE/iso/serial.log"
-          qemu-img create -f qcow2 "$disk" 32G
-
-          accel_args=(-accel 'tcg,thread=multi' -cpu max)
-          accel_name='tcg,thread=multi'
-          if [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
-            accel_args=(-accel kvm -cpu host)
-            accel_name='kvm'
-          fi
-          echo "Using QEMU acceleration: $accel_name"
-
-          qemu-system-x86_64 \
-            -machine q35 \
-            "${accel_args[@]}" \
-            -m 4096 \
-            -smp 2 \
-            -boot order=d \
-            -cdrom "$ISO_PATH" \
-            -drive "file=$disk,format=qcow2,if=virtio" \
-            -display none \
-            -monitor "unix:$monitor,server=on,wait=off" \
-            -serial "file:$serial" \
-            -no-reboot \
-            -daemonize
-
-          for i in $(seq 1 30); do
-            [ -S "$monitor" ] && break
-            sleep 1
+          for path in "${{ github.workspace }}/${required[@]}"; do
+            test -e "$path"
           done
-          test -S "$monitor"
-
-          sleep 30
-          printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-30s.ppm" | socat - "UNIX-CONNECT:$monitor"
-
-          sleep 60
-          printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-90s.ppm" | socat - "UNIX-CONNECT:$monitor"
-
-          # TCG can be painfully slow. Give Anaconda a full three minutes before
-          # the final evidence capture rather than declaring victory at GRUB.
-          sleep 90
-          if [ -S "$monitor" ]; then
-            printf 'screendump %s\n' "$GITHUB_WORKSPACE/iso/spider-boot-180s.ppm" | socat - "UNIX-CONNECT:$monitor"
-            printf 'info status\n' | socat - "UNIX-CONNECT:$monitor" | tee "$GITHUB_WORKSPACE/iso/qemu-status.txt"
-            printf 'quit\n' | socat - "UNIX-CONNECT:$monitor" || true
-          fi
-
-          found=0
-          for ppm in "$GITHUB_WORKSPACE"/iso/spider-boot-*.ppm; do
-            [ -f "$ppm" ] || continue
-            found=1
-            png="${ppm%.ppm}.png"
-            convert "$ppm" "$png"
-            identify "$png"
-            colors="$(convert "$png" -format '%k' info:)"
-            echo "$(basename "$png"): $colors colors"
-            if [ "$colors" -le 1 ]; then
-              echo "Captured VM screen is blank/monochrome: $png" >&2
-              exit 1
-            fi
-            rm -f "$ppm"
-          done
-          test "$found" -eq 1
-
-          grep -Fq 'VM status: running' "$GITHUB_WORKSPACE/iso/qemu-status.txt"
-
-          # A running VM can still be stuck in a very dramatic failure screen.
-          # Fail immediately if the serial console captured an unmistakable
-          # kernel or early-userspace fatal condition.
-          if grep -Eqi 'kernel panic|entering emergency mode|dracut.*emergency shell|failed to mount.*sysroot' "$serial"; then
-            echo "Fatal boot condition detected in serial log." >&2
-            cat "$serial" >&2
+          bash -n build_files/build.sh
+          bash -n tools/repair-installer-iso.sh
+          bash -n tools/test-minimal-installer-e2e.sh
+          grep -Fq 'systemctl set-default graphical.target' build_files/build.sh
+          grep -Fq 'systemctl enable plasmalogin.service' build_files/build.sh
+          if grep -Eiq 'webbie|web assembly|spider-os\.service|spider-ai-resident'             Containerfile build_files/build.sh tools/test-minimal-installer-e2e.sh; then
+            echo "Milestone 1 must not depend on application or Web Assembly services." >&2
             exit 1
           fi
-
-          echo "Spider OS produced non-blank boot displays through 180 seconds and remained running."
-
-      - name: Upload boot-test evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: Spider-OS-Boot-Test
-          path: |
-            iso/spider-boot-*.png
-            iso/serial.log
-            iso/qemu-status.txt
-          if-no-files-found: warn
-          retention-days: 14
