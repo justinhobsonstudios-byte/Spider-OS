@@ -143,6 +143,7 @@ grep -Fq 'Version = 0.7.0' "$workdir/verify-stamp/.buildstamp"
 
 root_buildstamp="$workdir/root-buildstamp"
 xorriso -osirrox on -indev "$output_iso" -extract /.buildstamp "$root_buildstamp" >/dev/null 2>&1
+test -s "$root_buildstamp"
 grep -Fq 'Product = Spider OS' "$root_buildstamp"
 grep -Fq 'Version = 0.7.0' "$root_buildstamp"
 
