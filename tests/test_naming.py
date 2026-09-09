@@ -6,6 +6,7 @@ from spider_os.constants import (
     ANCHOR_NAME,
     ANCHORS_NAME,
     APP_NAME,
+    DEFAULT_WAKE_PHRASES,
     DESKTOP_NAME,
     MEMORY_NAME,
     SECURITY_NAME,
@@ -27,6 +28,36 @@ class NamingContractTests(unittest.TestCase):
         self.assertEqual(ANCHORS_NAME, "Anchors")
         self.assertEqual(THREAD_NAME, "Thread")
         self.assertEqual(THREADS_NAME, "Threads")
+
+    def test_canonical_wake_phrases(self):
+        self.assertEqual(
+            DEFAULT_WAKE_PHRASES,
+            ("Hey Webbie", "Webbie", "Hey Web", "Web"),
+        )
+
+    def test_resident_service_preserves_voice_and_wake_phrases(self):
+        root = Path(__file__).resolve().parents[1]
+        service = (
+            root
+            / "system_files/usr/lib/systemd/user/spider-ai-resident.service"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Environment=SPIDER_OS_VOICE_ENABLED=1", service)
+        self.assertIn(
+            'Environment="SPIDER_OS_WAKE_PHRASES=Hey Webbie,Webbie,Hey Web,Web"',
+            service,
+        )
+        self.assertNotIn("SPIDER_AI_WAKE_PHRASES", service)
+
+    def test_first_login_records_kde_session_before_one_time_guard(self):
+        root = Path(__file__).resolve().parents[1]
+        bootstrap = (
+            root / "system_files/usr/bin/spider-os-first-login"
+        ).read_text(encoding="utf-8")
+        session_write = ': > "$session_marker"'
+        one_time_guard = 'if [ -f "$marker" ]; then'
+        self.assertIn('session_marker="$config_root/session-opened"', bootstrap)
+        self.assertIn(session_write, bootstrap)
+        self.assertLess(bootstrap.index(session_write), bootstrap.index(one_time_guard))
 
     def test_legacy_life_space_wording_is_not_user_facing(self):
         root = Path(__file__).resolve().parents[1]

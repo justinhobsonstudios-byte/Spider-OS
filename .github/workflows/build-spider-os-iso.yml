@@ -15,7 +15,6 @@ on:
       - 'src/**'
       - 'disk_config/**'
       - 'tools/**'
-      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
   pull_request:
     branches:
@@ -29,7 +28,6 @@ on:
       - 'src/**'
       - 'disk_config/**'
       - 'tools/**'
-      - 'Spider_OS_v0.7_GitHub_ISO_Ready.zip'
       - '.github/workflows/build-spider-os-iso.yml'
 
 permissions:
@@ -44,7 +42,7 @@ jobs:
   build-iso:
     name: Build bootable installer
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -55,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for command in podman unzip xorriso cpio xz; do
+          for command in podman unzip xorriso cpio xz qemu-system-x86_64 qemu-img socat convert ssh ssh-keygen openssl; do
             command -v "$command" >/dev/null 2>&1 || missing=1
           done
           if [ "$missing" -eq 1 ]; then
@@ -65,7 +63,13 @@ jobs:
               unzip \
               xorriso \
               cpio \
-              xz-utils
+              xz-utils \
+              qemu-system-x86 \
+              qemu-utils \
+              socat \
+              imagemagick \
+              openssh-client \
+              openssl
           fi
           podman --version
           xorriso -version | head -n 1
@@ -75,35 +79,26 @@ jobs:
         run: |
           set -euo pipefail
           project_root="$GITHUB_WORKSPACE"
-          if [ ! -d "$project_root/build_files" ] || \
-             [ ! -d "$project_root/system_files" ] || \
-             [ ! -d "$project_root/src/spider_os" ]; then
-            archive="$GITHUB_WORKSPACE/Spider_OS_v0.7_GitHub_ISO_Ready.zip"
-            if [ ! -f "$archive" ]; then
-              echo "Required source folders are missing and the ISO-ready source archive was not found." >&2
-              exit 1
+          required=(
+            build_files/build.sh
+            system_files/usr/lib/systemd/user/spider-ai-resident.service
+            system_files/usr/share/wallpapers/SpiderOS/contents/images/1920x1080.svg
+            system_files/usr/share/sounds/SpiderOS/stereo/spider-ai-ready.wav
+            src/spider_os/resident.py
+            src/spider_os/web/assets/spider-mark.svg
+          )
+          missing=0
+          for item in "${required[@]}"; do
+            if [ ! -e "$project_root/$item" ]; then
+              echo "Missing canonical Spider OS source: $item" >&2
+              missing=1
             fi
-            extract_root="$RUNNER_TEMP/spider-os-source"
-            rm -rf "$extract_root"
-            mkdir -p "$extract_root"
-            unzip -q "$archive" -d "$extract_root"
-            project_root=""
-            while IFS= read -r containerfile; do
-              candidate="$(dirname "$containerfile")"
-              if [ -d "$candidate/build_files" ] && \
-                 [ -d "$candidate/system_files" ] && \
-                 [ -d "$candidate/src/spider_os" ]; then
-                project_root="$candidate"
-                break
-              fi
-            done < <(find "$extract_root" -type f -name Containerfile -print)
-            if [ -z "$project_root" ]; then
-              echo "Could not find a complete Spider OS image-template tree inside the archive." >&2
-              find "$extract_root" -maxdepth 3 -type f -print | sort | head -n 200 >&2
-              exit 1
-            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Refusing to build without the canonical Spider OS source tree." >&2
+            exit 1
           fi
-          echo "Using Spider OS source tree: $project_root"
+          echo "Using canonical Spider OS source tree: $project_root"
           echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
 
       - name: Validate source
@@ -113,14 +108,19 @@ jobs:
           test -f "$GITHUB_WORKSPACE/Containerfile"
           test -f "$GITHUB_WORKSPACE/disk_config/iso-kde.toml"
           test -f "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
+          test -f "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
           test -d "$PROJECT_ROOT/build_files"
           test -d "$PROJECT_ROOT/system_files"
           test -d "$PROJECT_ROOT/src/spider_os"
+          test -d "$PROJECT_ROOT/tests"
           bash -n "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
+          bash -n "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
           python3 -m compileall -q "$PROJECT_ROOT/src/spider_os"
+          PYTHONPATH="$PROJECT_ROOT/src" python3 -m unittest discover \
+            -s "$PROJECT_ROOT/tests" -v
 
       - name: Free runner disk space
         shell: bash
@@ -198,16 +198,88 @@ jobs:
             "$iso_path" \
             "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso"
 
+      - name: Install, reboot, and verify Web Assembly
+        id: installer-e2e
+        shell: bash
+        timeout-minutes: 130
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/iso-e2e-evidence"
+          mkdir -p "$evidence"
+          chmod +x "$GITHUB_WORKSPACE/tools/inspect-installer-boot.sh"
+          chmod +x "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh"
+          "$GITHUB_WORKSPACE/tools/inspect-installer-boot.sh" \
+            "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso" \
+            "$evidence/boot-diagnostics.txt"
+          "$GITHUB_WORKSPACE/tools/test-installer-e2e.sh" \
+            "$GITHUB_WORKSPACE/Spider_OS_x86_64.iso" \
+            "$evidence"
+
+      - name: Summarize installer gate
+        if: always()
+        shell: bash
+        env:
+          INSTALLER_OUTCOME: ${{ steps.installer-e2e.outcome }}
+        run: |
+          set -euo pipefail
+          evidence="$GITHUB_WORKSPACE/iso-e2e-evidence"
+          {
+            echo "## Spider OS installer gate"
+            echo
+            echo "- Outcome: **$INSTALLER_OUTCOME**"
+            if [ -d "$evidence" ]; then
+              echo "- Evidence files produced: $(find "$evidence" -maxdepth 1 -type f | wc -l)"
+            else
+              echo "- Evidence directory was not created."
+            fi
+            diagnostic=""
+            for candidate in \
+              "$evidence/installed-verification.txt" \
+              "$evidence/web-assembly-diagnostics.txt" \
+              "$evidence/installer-serial.log"
+            do
+              if [ -s "$candidate" ]; then
+                diagnostic="$candidate"
+                break
+              fi
+            done
+            if [ -n "$diagnostic" ]; then
+              echo
+              echo "### Diagnostic tail: $(basename "$diagnostic")"
+              echo "~~~text"
+              tail -n 200 "$diagnostic"
+              echo "~~~"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$INSTALLER_OUTCOME" != success ]; then
+            echo "::error title=Spider OS installer gate::Full install verification ended with outcome: $INSTALLER_OUTCOME"
+          fi
+
+      - name: Upload full-install evidence
+        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Spider-OS-Install-Test
+          path: iso-e2e-evidence/
+          if-no-files-found: warn
+          retention-days: 1
+
       - name: Prepare ISO artifact
+        if: ${{ steps.installer-e2e.outcome == 'success' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
         shell: bash
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          test -f Spider_OS_x86_64.iso
+          if [ ! -f Spider_OS_x86_64.iso ]; then
+            echo "Spider OS ISO is unavailable; nothing to preserve from this run."
+            exit 0
+          fi
           sha256sum Spider_OS_x86_64.iso > Spider_OS_x86_64.iso.sha256
           ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
 
       - name: Upload Spider OS ISO
+        if: ${{ steps.installer-e2e.outcome == 'success' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-ISO
@@ -216,4 +288,29 @@ jobs:
             Spider_OS_x86_64.iso.sha256
           if-no-files-found: error
           compression-level: 0
-          retention-days: 14
+          retention-days: 1
+
+      - name: Remove ephemeral CI container image
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="$GITHUB_REPOSITORY_OWNER"
+          package="spider-os"
+          tag="ci-${GITHUB_SHA}"
+          version_id="$(
+            gh api --paginate \
+              "/users/$owner/packages/container/$package/versions?per_page=100" \
+              --jq ".[] | select((.metadata.container.tags // []) | index(\"$tag\")) | .id" \
+              | head -n 1
+          )"
+          if [ -n "$version_id" ]; then
+            echo "Removing ephemeral container version $version_id ($tag)"
+            gh api --method DELETE \
+              "/users/$owner/packages/container/$package/versions/$version_id"
+          else
+            echo "No ephemeral container version found for $tag"
+          fi
