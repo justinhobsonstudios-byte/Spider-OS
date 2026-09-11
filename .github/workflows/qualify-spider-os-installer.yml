@@ -29,6 +29,7 @@ jobs:
       - name: Resolve source run
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_RUN: ${{ inputs.source_run_id }}
           WORKFLOW_RUN: ${{ github.event.workflow_run.id }}
@@ -45,8 +46,6 @@ jobs:
           fi
           echo "SOURCE_RUN=$source_run" >> "$GITHUB_ENV"
           echo "SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: Checkout exact candidate source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

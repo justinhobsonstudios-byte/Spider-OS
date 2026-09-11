@@ -140,7 +140,7 @@ jobs:
           test -s Spider_OS_x86_64.iso
           xorriso -indev Spider_OS_x86_64.iso -pvd_info | tee iso-structure.txt
           xorriso -indev Spider_OS_x86_64.iso -report_el_torito plain | tee -a iso-structure.txt
-          xorriso -indev Spider_OS_x86_64.iso -find / -maxdepth 3 -type f -print | tee -a iso-structure.txt
+          xorriso -indev Spider_OS_x86_64.iso -find / -maxdepth 3 -type f -exec echo | tee -a iso-structure.txt
           grep -F 'SPIDER_OS' iso-structure.txt
           grep -Ei 'El Torito|boot' iso-structure.txt >/dev/null
           ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
