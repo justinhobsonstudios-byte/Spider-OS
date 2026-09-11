@@ -91,7 +91,9 @@ mkdir -p "$kickstart_root"
 cat > "$kickstart_root/spider-ci.ks" <<KICKSTART
 %include /run/install/repo/osbuild-base.ks
 
-text --non-interactive
+# Pykickstart applies this mode to the installed system too. Exercise the
+# production graphical installer without forcing the deployed OS into text boot.
+graphical --non-interactive
 firewall --enabled --service=ssh
 # NetworkManager and SSH are needed for CI verification. Do not ask Anaconda
 # to enable SDDM here: Aurora owns the display-manager enablement in the image,
