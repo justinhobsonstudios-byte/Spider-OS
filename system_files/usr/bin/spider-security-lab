@@ -80,7 +80,10 @@ print(secrets.token_urlsafe(12)[:8])
 PY
 )"
     printf '%s\n' "$secret" \
-      | podman exec -i -u kali "$container_name" tigervncpasswd -f \
+      | podman exec -i -u kali \
+          -e HOME=/home/kali -e USER=kali -e LOGNAME=kali \
+          -w /home/kali \
+          "$container_name" tigervncpasswd -f \
       > "$password_file"
     chmod 0600 "$password_file"
   fi
@@ -234,19 +237,23 @@ start_desktop() {
 
   create_vnc_password
   ensure_running
-  podman exec -u kali -e SPIDER_KALI_GEOMETRY="$geometry" "$container_name" bash -lc '
-    tigervncserver -kill :1 >/dev/null 2>&1 || true
-    tigervncserver :1 \
-      -desktop "Kali Bay" \
-      -geometry "$SPIDER_KALI_GEOMETRY" \
-      -depth 24 \
-      -localhost no \
-      -SecurityTypes TLSVnc \
-      -PasswordFile /home/kali/.config/tigervnc/passwd \
-      -AcceptCutText=0 \
-      -SendCutText=0 \
-      -xstartup /usr/local/bin/spider-kali-xstartup
-  '
+  podman exec -u kali \
+    -e HOME=/home/kali -e USER=kali -e LOGNAME=kali \
+    -e SPIDER_KALI_GEOMETRY="$geometry" \
+    -w /home/kali \
+    "$container_name" bash -lc '
+      tigervncserver -kill :1 >/dev/null 2>&1 || true
+      tigervncserver :1 \
+        -desktop "Kali Bay" \
+        -geometry "$SPIDER_KALI_GEOMETRY" \
+        -depth 24 \
+        -localhost no \
+        -SecurityTypes TLSVnc \
+        -PasswordFile /home/kali/.config/tigervnc/passwd \
+        -AcceptCutText=0 \
+        -SendCutText=0 \
+        -xstartup /usr/local/bin/spider-kali-xstartup
+    '
 }
 
 wait_for_vnc() {
@@ -258,7 +265,11 @@ wait_for_vnc() {
     sleep 0.25
   done
   printf '%s\n' "Kali Bay desktop did not become ready on 127.0.0.1:${host_port}."
-  podman exec -u kali "$container_name" sh -lc 'tail -n 80 ~/.config/tigervnc/*.log 2>/dev/null || tail -n 80 ~/.vnc/*.log 2>/dev/null || true'
+  podman exec -u kali \
+    -e HOME=/home/kali -e USER=kali -e LOGNAME=kali \
+    -w /home/kali \
+    "$container_name" sh -lc \
+    'tail -n 80 ~/.config/tigervnc/*.log 2>/dev/null || tail -n 80 ~/.vnc/*.log 2>/dev/null || true'
   exit 1
 }
 
@@ -288,7 +299,10 @@ enter_lab() {
     exit 1
   fi
   ensure_running
-  podman exec -it -u kali "$container_name" bash -l
+  podman exec -it -u kali \
+    -e HOME=/home/kali -e USER=kali -e LOGNAME=kali \
+    -w /home/kali \
+    "$container_name" bash -l
 }
 
 stop_lab() {
@@ -296,7 +310,10 @@ stop_lab() {
     printf '%s\n' "Kali Bay is not installed."
     return 0
   fi
-  podman exec -u kali "$container_name" tigervncserver -kill :1 >/dev/null 2>&1 || true
+  podman exec -u kali \
+    -e HOME=/home/kali -e USER=kali -e LOGNAME=kali \
+    -w /home/kali \
+    "$container_name" tigervncserver -kill :1 >/dev/null 2>&1 || true
   podman stop "$container_name" >/dev/null
   printf '%s\n' "Kali Bay stopped."
 }
