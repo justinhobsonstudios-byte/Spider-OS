@@ -25,6 +25,11 @@ chmod 0755 \
   /usr/bin/spider-security-lab \
   /usr/libexec/spider-os-session-bootstrap
 
+# Fail the image build if Kali Bay's launcher is syntactically broken or its
+# graphical viewer dependency is missing.
+bash -n /usr/bin/spider-security-lab
+command -v vncviewer >/dev/null
+
 # The installed image must boot to KDE. Aurora 44 uses Plasma Login Manager;
 # keep older Aurora images usable when they still ship SDDM.
 if [ -f /usr/lib/systemd/system/plasmalogin.service ]; then
