@@ -1,24 +1,45 @@
 #!/usr/bin/env bash
 set -u
 
-# KDE/SDDM can start before the user systemd manager has the session's graphical
-# environment. Import it before starting Web Assembly so xdg-open and any KDE
-# helpers run in the real logged-in desktop session.
+log_dir="$HOME/.local/state/spider-os"
+mkdir -p "$log_dir"
+exec >>"$log_dir/session-bootstrap.log" 2>&1
+
+echo "=== Spider OS session bootstrap $(date --iso-8601=seconds) ==="
+
+# KDE owns the graphical session. Import that environment into the user
+# systemd manager before starting resident services that may use desktop APIs.
 systemctl --user import-environment \
   DISPLAY \
   WAYLAND_DISPLAY \
   XDG_CURRENT_DESKTOP \
   XDG_SESSION_DESKTOP \
   XDG_SESSION_TYPE \
-  DBUS_SESSION_BUS_ADDRESS 2>/dev/null || true
+  DBUS_SESSION_BUS_ADDRESS || true
 
-# Clear stale failures from an earlier pre-session start, then establish the
-# startup order Spider OS actually requires: Web core -> Web Assembly -> Webbie.
-systemctl --user reset-failed \
-  spider-os.service \
-  spider-web-assembly.service \
-  spider-ai-resident.service 2>/dev/null || true
+systemctl --user reset-failed spider-os.service spider-ai-resident.service || true
+systemctl --user start spider-os.service
 
-systemctl --user restart spider-os.service
-systemctl --user restart spider-web-assembly.service
+# The Web is the session foundation. Do not continue until its local API is
+# actually answering, but keep the desktop usable if startup fails.
+web_ready=0
+for _ in $(seq 1 60); do
+  if curl --fail --silent --max-time 2 http://127.0.0.1:8765/api/health >/dev/null 2>&1; then
+    web_ready=1
+    break
+  fi
+  sleep 1
+done
+
+if [ "$web_ready" -ne 1 ]; then
+  echo "The Web core did not become healthy within 60 seconds."
+  systemctl --user --no-pager --full status spider-os.service || true
+  journalctl --user -b -u spider-os.service --no-pager -n 200 || true
+  exit 1
+fi
+
+/usr/bin/spider-os-first-login
+/usr/bin/spider-os-open --session || true
 systemctl --user start spider-ai-resident.service
+
+echo "Spider OS session bootstrap complete."

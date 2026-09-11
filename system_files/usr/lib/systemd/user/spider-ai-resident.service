@@ -1,6 +1,6 @@
 [Unit]
 Description=Web always-on resident intelligence
-After=spider-os.service sound.target
+After=spider-os.service
 Wants=spider-os.service
 
 [Service]

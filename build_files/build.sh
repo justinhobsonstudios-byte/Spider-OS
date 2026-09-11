@@ -14,7 +14,8 @@ dnf5 install -y \
   curl \
   distrobox \
   podman \
-  python3
+  python3 \
+  tigervnc
 
 chmod 0755 \
   /usr/bin/spider-os \
@@ -24,7 +25,27 @@ chmod 0755 \
   /usr/bin/spider-security-lab \
   /usr/libexec/spider-os-session-bootstrap
 
+# Fail the image build if Kali Bay's launcher is syntactically broken or its
+# graphical viewer dependency is missing.
+bash -n /usr/bin/spider-security-lab
+command -v vncviewer >/dev/null
+
+# The installed image must boot to KDE. Aurora 44 uses Plasma Login Manager;
+# keep older Aurora images usable when they still ship SDDM.
+if [ -f /usr/lib/systemd/system/plasmalogin.service ]; then
+  display_manager=plasmalogin.service
+elif [ -f /usr/lib/systemd/system/sddm.service ]; then
+  display_manager=sddm.service
+else
+  echo 'No supported KDE display manager is installed.' >&2
+  exit 1
+fi
+systemctl enable --force "$display_manager"
+systemctl set-default graphical.target
+
+# The Web core and Webbie are ordinary user services. KDE owns session assembly
+# through one autostart bridge; do not create a second systemd assembly path.
 systemctl --global enable spider-os.service
 systemctl --global enable spider-ai-resident.service
-systemctl --global enable spider-web-assembly.service
+
 dnf5 clean all

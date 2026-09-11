@@ -1,10 +1,23 @@
 [Desktop Entry]
 Type=Application
 Name=Kali Bay
-Comment=Open the isolated Kali security environment
-Exec=konsole -e spider-security-lab enter
-Icon=utilities-terminal
+Comment=Open the isolated graphical Kali security workspace
+Exec=konsole -e spider-security-lab open
+Icon=spider-os
 Terminal=false
+StartupNotify=true
 Categories=Development;System;Security;
-Keywords=Kali;Security;Pentest;Lab;
+Keywords=Kali;Security;Pentest;Lab;Workspace;
+Actions=Shell;Status;Stop;
 
+[Desktop Action Shell]
+Name=Open Kali Bay Shell
+Exec=konsole -e spider-security-lab enter
+
+[Desktop Action Status]
+Name=Kali Bay Status
+Exec=konsole --hold -e spider-security-lab status
+
+[Desktop Action Stop]
+Name=Stop Kali Bay
+Exec=konsole --hold -e spider-security-lab stop

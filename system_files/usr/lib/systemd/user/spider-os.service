@@ -1,6 +1,5 @@
 [Unit]
 Description=Spider OS Web core service
-After=graphical-session.target network.target
 
 [Service]
 Type=simple
