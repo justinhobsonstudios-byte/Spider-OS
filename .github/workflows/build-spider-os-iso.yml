@@ -13,6 +13,7 @@ on:
       - 'system_files/**'
       - 'src/**'
       - 'tests/**'
+      - 'tools/**'
       - 'disk_config/**'
       - '.github/workflows/build-spider-os-iso.yml'
   pull_request:
@@ -24,6 +25,7 @@ on:
       - 'system_files/**'
       - 'src/**'
       - 'tests/**'
+      - 'tools/**'
       - 'disk_config/**'
       - '.github/workflows/build-spider-os-iso.yml'
 
