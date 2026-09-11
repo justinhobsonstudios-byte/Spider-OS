@@ -145,7 +145,19 @@ jobs:
           grep -Ei 'El Torito|boot' iso-structure.txt >/dev/null
           ls -lh Spider_OS_x86_64.iso Spider_OS_x86_64.iso.sha256
 
-      - name: Upload Spider OS candidate ISO
+      # Cache is the exact-run CI handoff. Artifact publication is optional and
+      # must not block qualification when the repository artifact quota is full.
+      - name: Cache exact candidate for qualification
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            Spider_OS_x86_64.iso
+            Spider_OS_x86_64.iso.sha256
+            iso-structure.txt
+          key: spider-os-candidate-${{ github.run_id }}-${{ github.sha }}
+
+      - name: Publish downloadable candidate ISO (best effort)
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-Candidate-${{ github.sha }}
@@ -191,20 +203,23 @@ jobs:
             qemu-system-x86 qemu-utils socat imagemagick xorriso \
             openssh-client openssl unzip curl
 
-      - name: Download candidate ISO from this build
+      - name: Restore exact candidate from qualification cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            Spider_OS_x86_64.iso
+            Spider_OS_x86_64.iso.sha256
+            iso-structure.txt
+          key: spider-os-candidate-${{ github.run_id }}-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Verify exact candidate checksum
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          artifact_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
-            --jq '.artifacts | map(select(.name | startswith("Spider-OS-Candidate-"))) | map(select(.expired == false)) | sort_by(.created_at) | last | .id // empty')"
-          test -n "$artifact_id" || { echo "No candidate ISO artifact found on build run $GITHUB_RUN_ID" >&2; exit 1; }
-          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > candidate.zip
-          mkdir -p candidate
-          unzip -q candidate.zip -d candidate
-          cp candidate/Spider_OS_x86_64.iso ./Spider_OS_x86_64.iso
-          sha256sum -c candidate/Spider_OS_x86_64.iso.sha256
+          test -s Spider_OS_x86_64.iso
+          test -s Spider_OS_x86_64.iso.sha256
+          sha256sum -c Spider_OS_x86_64.iso.sha256
 
       - name: Install candidate and verify Spider OS session
         id: qualify
@@ -242,6 +257,7 @@ jobs:
 
       - name: Upload qualification failure evidence
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Spider-OS-Qualification-${{ github.sha }}
