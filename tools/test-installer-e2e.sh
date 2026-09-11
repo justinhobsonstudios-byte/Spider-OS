@@ -105,7 +105,8 @@ zerombr
 autopart --noswap --type=btrfs
 reboot
 
-%post --log=/root/spider-ci-post.log
+%post --erroronfail --log=/root/spider-ci-post.log
+set -eu
 session=''
 for candidate in \
   /usr/share/wayland-sessions/plasma.desktop \
@@ -125,13 +126,29 @@ if [ -z "\$session" ]; then
   echo 'No Plasma desktop session file found for Spider OS CI autologin.' >&2
   exit 1
 fi
-install -d -m 0755 /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/99-spider-ci-autologin.conf <<SDDM
+# Configure the manager enabled by the production image. Do not repair its
+# service alias or boot target in CI: those must work in the shipped image.
+display_manager="\$(basename "\$(readlink -f /etc/systemd/system/display-manager.service)")"
+case "\$display_manager" in
+  plasmalogin.service)
+    autologin_config=/etc/plasmalogin.conf
+    ;;
+  sddm.service)
+    install -d -m 0755 /etc/sddm.conf.d
+    autologin_config=/etc/sddm.conf.d/99-spider-ci-autologin.conf
+    ;;
+  *)
+    echo "Unsupported or missing display-manager.service: \$display_manager" >&2
+    exit 1
+    ;;
+esac
+cat > "\$autologin_config" <<AUTOLOGIN
 [Autologin]
 User=spiderci
 Session=\$session
 Relogin=false
-SDDM
+AUTOLOGIN
+printf '%s\n' "\$display_manager" > /etc/spider-ci-display-manager
 printf 'Selected Plasma session: %s\n' "\$session" > /etc/spider-ci-session
 install -d -m 0750 /etc/sudoers.d
 echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/99-spider-ci
@@ -233,7 +250,7 @@ fi
 qemu-img info "$disk" | tee "$evidence/installed-disk.txt"
 
 # Boot only the installed disk. SSH proves the deployed OS reached userspace;
-# SDDM autologin then exercises the real KDE autostart entries used by Spider OS.
+# Display-manager autologin exercises the real KDE autostart used by Spider OS.
 installed_monitor="$workdir/installed-monitor.sock"
 installed_pidfile="$workdir/installed.pid"
 installed_serial="$evidence/installed-serial.log"
@@ -272,14 +289,16 @@ capture_session_diagnostics() {
   ssh "${ssh_args[@]}" 'set +e
     echo "=== CI install markers ==="
     sudo cat /etc/spider-ci-session 2>/dev/null
+    sudo cat /etc/spider-ci-display-manager 2>/dev/null
+    sudo cat /etc/plasmalogin.conf 2>/dev/null
     sudo cat /etc/sddm.conf.d/99-spider-ci-autologin.conf 2>/dev/null
     echo
     echo "=== system boot/display state ==="
     systemctl get-default
     sudo systemctl --no-pager --full status display-manager graphical.target
     echo
-    echo "=== SDDM journal ==="
-    sudo journalctl -b -u sddm --no-pager
+    echo "=== display-manager journal ==="
+    sudo journalctl -b -u plasmalogin -u sddm --no-pager
     echo
     echo "=== login sessions ==="
     loginctl list-sessions
@@ -290,8 +309,8 @@ capture_session_diagnostics() {
     done
     who
     echo
-    echo "=== Plasma/SDDM processes ==="
-    ps -ef | grep -E "[s]ddm|[k]win|[p]lasmashell|[s]tartplasma|[k]ded"
+    echo "=== Plasma/display-manager processes ==="
+    ps -ef | grep -E "[p]lasmalogin|[s]ddm|[k]win|[p]lasmashell|[s]tartplasma|[k]ded"
     echo
     echo "=== installed session files ==="
     ls -la /usr/share/wayland-sessions /usr/share/xsessions 2>/dev/null
@@ -311,6 +330,7 @@ capture_session_diagnostics() {
     echo
     echo "=== session logs ==="
     for log in \
+      "$HOME/.local/state/spider-os/session-bootstrap.log" \
       "$HOME/.local/share/sddm/wayland-session.log" \
       "$HOME/.local/share/sddm/xorg-session.log" \
       "$HOME/.local/share/plasmalogin/wayland-session.log" \
@@ -322,7 +342,7 @@ capture_session_diagnostics() {
     done
     echo
     echo "=== package state ==="
-    rpm -q sddm plasma-workspace 2>/dev/null
+    rpm -q plasma-login-manager sddm plasma-workspace 2>/dev/null
   ' > "$target" 2>&1 || true
 }
 
@@ -359,15 +379,15 @@ report_assembly_state() {
     systemctl get-default
     sudo systemctl --no-pager --full status display-manager
     loginctl list-sessions
-    ps -ef | grep -E "[s]ddm|[k]win|[p]lasmashell|[s]tartplasma|[k]ded"
+    ps -ef | grep -E "[p]lasmalogin|[s]ddm|[k]win|[p]lasmashell|[s]tartplasma|[k]ded"
 
     echo
     echo "=== recent Spider OS user-service journal ==="
     journalctl --user -b -u spider-os.service -u spider-ai-resident.service --no-pager -n 120
 
     echo
-    echo "=== recent SDDM journal ==="
-    sudo journalctl -b -u sddm --no-pager -n 120
+    echo "=== recent display-manager journal ==="
+    sudo journalctl -b -u plasmalogin -u sddm --no-pager -n 120
   ' 2>&1 || true
 }
 
@@ -432,6 +452,10 @@ ssh "${ssh_args[@]}" '
   set -eu
   test -f /etc/spider-ci-installed
   test -s /etc/spider-ci-session
+  test -s /etc/spider-ci-display-manager
+  test "$(systemctl get-default)" = graphical.target
+  systemctl is-active graphical.target display-manager.service
+  pgrep -u "$(id -u)" -x plasmashell
   test -x /usr/bin/spider-os
   test -x /usr/bin/spider-os-first-login
   test -f "$HOME/.config/spider-os/desktop-initialized"
