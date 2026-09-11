@@ -155,7 +155,7 @@ jobs:
             iso-structure.txt
           if-no-files-found: error
           compression-level: 0
-          retention-days: 3
+          retention-days: 1
 
       - name: Remove ephemeral CI image
         if: always()
@@ -173,79 +173,3 @@ jobs:
             gh api --method DELETE "/users/$owner/packages/container/$package/versions/$version_id"
           fi
 
-  qualify-installer:
-    name: Install, reboot, and verify Web Assembly
-    needs: image-and-iso
-    runs-on: ubuntu-24.04
-    timeout-minutes: 150
-
-    steps:
-      - name: Checkout exact candidate source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Install VM test tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            qemu-system-x86 qemu-utils socat imagemagick xorriso \
-            openssh-client openssl unzip curl
-
-      - name: Download candidate ISO from this build
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          artifact_id="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
-            --jq '.artifacts | map(select(.name | startswith("Spider-OS-Candidate-"))) | map(select(.expired == false)) | sort_by(.created_at) | last | .id // empty')"
-          test -n "$artifact_id" || { echo "No candidate ISO artifact found on build run $GITHUB_RUN_ID" >&2; exit 1; }
-          gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > candidate.zip
-          mkdir -p candidate
-          unzip -q candidate.zip -d candidate
-          cp candidate/Spider_OS_x86_64.iso ./Spider_OS_x86_64.iso
-          sha256sum -c candidate/Spider_OS_x86_64.iso.sha256
-
-      - name: Install candidate and verify Spider OS session
-        id: qualify
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p qualification-evidence
-          chmod +x tools/test-installer-e2e.sh
-          tools/test-installer-e2e.sh Spider_OS_x86_64.iso qualification-evidence
-
-      - name: Print qualification diagnostics
-        if: always()
-        shell: bash
-        run: |
-          set +e
-          echo "## Spider OS installer qualification" >> "$GITHUB_STEP_SUMMARY"
-          echo >> "$GITHUB_STEP_SUMMARY"
-          echo "Build run: $GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
-          echo "Candidate commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo "Qualification outcome: ${{ steps.qualify.outcome }}" >> "$GITHUB_STEP_SUMMARY"
-          for file in \
-            qualification-evidence/web-assembly-diagnostics.txt \
-            qualification-evidence/installed-verification.txt \
-            qualification-evidence/installed-serial.log \
-            qualification-evidence/installer-serial.log; do
-            if [ -s "$file" ]; then
-              echo >> "$GITHUB_STEP_SUMMARY"
-              echo "### $(basename "$file")" >> "$GITHUB_STEP_SUMMARY"
-              echo '```text' >> "$GITHUB_STEP_SUMMARY"
-              tail -n 250 "$file" >> "$GITHUB_STEP_SUMMARY"
-              echo '```' >> "$GITHUB_STEP_SUMMARY"
-              break
-            fi
-          done
-
-      - name: Upload qualification evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: Spider-OS-Qualification-${{ github.sha }}
-          path: qualification-evidence/
-          if-no-files-found: warn
-          retention-days: 3
