@@ -14,7 +14,8 @@ dnf5 install -y \
   curl \
   distrobox \
   podman \
-  python3
+  python3 \
+  tigervnc
 
 chmod 0755 \
   /usr/bin/spider-os \
