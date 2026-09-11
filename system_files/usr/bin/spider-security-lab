@@ -3,23 +3,49 @@ set -euo pipefail
 
 container_name=spider-kali
 image_name=docker.io/kalilinux/kali-rolling
+home_volume=spider-kali-home
+host_port="${SPIDER_KALI_VNC_PORT:-5907}"
+geometry="${SPIDER_KALI_GEOMETRY:-1600x900}"
+state_dir="${XDG_CONFIG_HOME:-$HOME/.config}/spider-os/kali-bay"
+password_file="$state_dir/vnc.passwd"
 
 usage() {
   printf '%s\n' \
-    "Spider OS Security Lab" \
-    "Usage: spider-security-lab setup [headless|default|large]" \
+    "Kali Bay - Spider OS isolated security workspace" \
+    "Usage: spider-security-lab open" \
+    "       spider-security-lab setup [headless|default|large]" \
     "       spider-security-lab enter" \
     "       spider-security-lab stop" \
     "       spider-security-lab status" \
     "       spider-security-lab reset" \
+    "       spider-security-lab purge" \
     "" \
+    "The graphical profiles run an XFCE Kali desktop in a rootless Podman container." \
+    "No Spider OS home folders are mounted into Kali Bay." \
     "Use only on systems you own or are explicitly authorized to assess."
 }
 
-require_podman() {
-  if ! command -v podman >/dev/null 2>&1; then
-    printf '%s\n' "Podman is required but not installed."
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf '%s\n' "$2"
     exit 1
+  fi
+}
+
+validate_settings() {
+  case "$host_port" in
+    ''|*[!0-9]*)
+      printf '%s\n' "SPIDER_KALI_VNC_PORT must be a numeric TCP port."
+      exit 2
+      ;;
+  esac
+  if [ "$host_port" -lt 1024 ] || [ "$host_port" -gt 65535 ]; then
+    printf '%s\n' "SPIDER_KALI_VNC_PORT must be between 1024 and 65535."
+    exit 2
+  fi
+  if [[ ! "$geometry" =~ ^[0-9]+x[0-9]+$ ]]; then
+    printf '%s\n' "SPIDER_KALI_GEOMETRY must look like 1600x900."
+    exit 2
   fi
 }
 
@@ -27,85 +53,319 @@ container_exists() {
   podman container exists "$container_name"
 }
 
-setup_lab() {
-  profile=headless
-  if [ "$#" -gt 0 ]; then
-    profile="$1"
+ensure_running() {
+  podman start "$container_name" >/dev/null 2>&1 || true
+}
+
+lab_ready() {
+  container_exists || return 1
+  ensure_running
+  podman exec "$container_name" test -f /var/lib/spider-kali/ready >/dev/null 2>&1
+}
+
+installed_profile() {
+  if ! lab_ready; then
+    return 1
   fi
+  podman exec "$container_name" cat /var/lib/spider-kali/profile 2>/dev/null || printf '%s\n' unknown
+}
+
+create_vnc_password() {
+  install -d -m 0700 "$state_dir"
+  if [ ! -s "$password_file" ]; then
+    local secret
+    secret="$(python3 - <<'PY'
+import secrets
+print(secrets.token_urlsafe(12)[:8])
+PY
+)"
+    printf '%s\n' "$secret" \
+      | podman exec -i -u kali "$container_name" tigervncpasswd -f \
+      > "$password_file"
+    chmod 0600 "$password_file"
+  fi
+  podman cp "$password_file" "$container_name":/home/kali/.config/tigervnc/passwd >/dev/null
+  podman exec "$container_name" sh -lc \
+    'chown kali:kali /home/kali/.config/tigervnc/passwd && chmod 600 /home/kali/.config/tigervnc/passwd'
+}
+
+setup_lab() {
+  local profile="${1:-default}"
+  local metapackage
+  local gui=1
+
   case "$profile" in
-    headless) metapackage=kali-linux-headless ;;
-    default) metapackage=kali-linux-default ;;
-    large) metapackage=kali-linux-large ;;
+    headless)
+      metapackage=kali-linux-headless
+      gui=0
+      ;;
+    default)
+      metapackage=kali-linux-default
+      ;;
+    large)
+      metapackage=kali-linux-large
+      ;;
     *)
       printf '%s\n' "Unknown profile: $profile"
       exit 2
       ;;
   esac
-  if container_exists; then
-    printf '%s\n' "The Spider Kali lab already exists."
-    exit 0
+
+  if lab_ready; then
+    local existing
+    existing="$(installed_profile)"
+    printf '%s\n' "Kali Bay is already ready with profile: $existing"
+    if [ "$existing" != "$profile" ]; then
+      printf '%s\n' "Use 'spider-security-lab reset' before changing profiles."
+    fi
+    return 0
   fi
 
+  if container_exists; then
+    printf '%s\n' "Removing incomplete Kali Bay container from an earlier setup attempt..."
+    podman rm --force "$container_name" >/dev/null
+  fi
+
+  if ! podman volume exists "$home_volume"; then
+    podman volume create "$home_volume" >/dev/null
+  fi
+
+  printf '%s\n' "Downloading Kali Linux..."
   podman pull "$image_name"
-  podman create \
-    --name "$container_name" \
-    --hostname spider-kali \
-    --security-opt no-new-privileges \
-    --cap-drop all \
-    --cap-add net_raw \
-    --pids-limit 2048 \
-    --memory 8g \
-    "$image_name" \
-    sleep infinity
-  podman start "$container_name"
-  podman exec "$container_name" sh -lc \
-    "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y $metapackage && apt-get clean"
+
+  local create_args=(
+    --name "$container_name"
+    --hostname spider-kali
+    --label io.spider-os.workspace=kali-bay
+    --pids-limit 4096
+    --memory 8g
+    --cap-add NET_RAW
+    --cap-add NET_ADMIN
+    --volume "$home_volume:/home/kali:Z"
+  )
+  if [ "$gui" -eq 1 ]; then
+    create_args+=(--publish "127.0.0.1:${host_port}:5901")
+  fi
+
+  podman create "${create_args[@]}" "$image_name" sleep infinity >/dev/null
+  podman start "$container_name" >/dev/null
+
+  printf '%s\n' "Installing Kali Bay profile '$profile'. This can take a while on first launch..."
+  if [ "$gui" -eq 1 ]; then
+    podman exec -i "$container_name" bash -s -- "$metapackage" "$profile" <<'CONTAINER_SETUP'
+set -euo pipefail
+metapackage="$1"
+profile="$2"
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y \
+  "$metapackage" \
+  kali-desktop-xfce \
+  tigervnc-standalone-server \
+  tigervnc-tools \
+  dbus-x11 \
+  sudo
+
+if ! id kali >/dev/null 2>&1; then
+  useradd -M -d /home/kali -s /bin/bash kali
+fi
+install -d -m 0755 -o kali -g kali /home/kali
+install -d -m 0700 -o kali -g kali /home/kali/.config/tigervnc
+usermod -aG sudo kali
+printf '%s\n' 'kali ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/kali-bay
+chmod 0440 /etc/sudoers.d/kali-bay
+
+cat > /usr/local/bin/spider-kali-xstartup <<'XSTARTUP'
+#!/bin/sh
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+exec dbus-run-session -- startxfce4
+XSTARTUP
+chmod 0755 /usr/local/bin/spider-kali-xstartup
+
+install -d -m 0755 /var/lib/spider-kali
+printf '%s\n' "$profile" > /var/lib/spider-kali/profile
+touch /var/lib/spider-kali/ready
+chown -R kali:kali /home/kali
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+CONTAINER_SETUP
+    create_vnc_password
+  else
+    podman exec -i "$container_name" bash -s -- "$metapackage" "$profile" <<'CONTAINER_SETUP'
+set -euo pipefail
+metapackage="$1"
+profile="$2"
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y "$metapackage" sudo
+if ! id kali >/dev/null 2>&1; then
+  useradd -M -d /home/kali -s /bin/bash kali
+fi
+install -d -m 0755 -o kali -g kali /home/kali
+usermod -aG sudo kali
+printf '%s\n' 'kali ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/kali-bay
+chmod 0440 /etc/sudoers.d/kali-bay
+install -d -m 0755 /var/lib/spider-kali
+printf '%s\n' "$profile" > /var/lib/spider-kali/profile
+touch /var/lib/spider-kali/ready
+chown -R kali:kali /home/kali
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+CONTAINER_SETUP
+  fi
+
   printf '%s\n' \
-    "Security Lab installed with $metapackage." \
-    "It has no host folders mounted. Use 'spider-security-lab enter' to open it."
+    "Kali Bay is ready with $metapackage." \
+    "Its persistent home is stored in a Podman-managed volume, not mounted from Spider OS." \
+    "Use 'spider-security-lab open' for the graphical workspace or 'spider-security-lab enter' for a shell."
+}
+
+start_desktop() {
+  local profile
+  profile="$(installed_profile)" || {
+    printf '%s\n' "Kali Bay is not installed."
+    exit 1
+  }
+  if [ "$profile" = headless ]; then
+    printf '%s\n' "The headless profile has no graphical desktop. Reset and install the default or large profile."
+    exit 1
+  fi
+
+  create_vnc_password
+  ensure_running
+  podman exec -u kali -e SPIDER_KALI_GEOMETRY="$geometry" "$container_name" bash -lc '
+    tigervncserver -kill :1 >/dev/null 2>&1 || true
+    tigervncserver :1 \
+      -desktop "Kali Bay" \
+      -geometry "$SPIDER_KALI_GEOMETRY" \
+      -depth 24 \
+      -localhost no \
+      -SecurityTypes TLSVnc \
+      -PasswordFile /home/kali/.config/tigervnc/passwd \
+      -AcceptCutText=0 \
+      -SendCutText=0 \
+      -xstartup /usr/local/bin/spider-kali-xstartup
+  '
+}
+
+wait_for_vnc() {
+  local attempt
+  for attempt in $(seq 1 40); do
+    if bash -c "exec 3<>/dev/tcp/127.0.0.1/${host_port}" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.25
+  done
+  printf '%s\n' "Kali Bay desktop did not become ready on 127.0.0.1:${host_port}."
+  podman exec -u kali "$container_name" sh -lc 'tail -n 80 ~/.config/tigervnc/*.log 2>/dev/null || tail -n 80 ~/.vnc/*.log 2>/dev/null || true'
+  exit 1
+}
+
+open_lab() {
+  require_command vncviewer "TigerVNC Viewer is required but not installed in Spider OS."
+  if ! lab_ready; then
+    setup_lab default
+  fi
+  start_desktop
+  wait_for_vnc
+  printf '%s\n' "Opening Kali Bay..."
+  nohup vncviewer \
+    -Shared=1 \
+    -RemoteResize=1 \
+    -Maximize=1 \
+    -SecurityTypes=TLSVnc \
+    -PasswordFile="$password_file" \
+    -AcceptClipboard=0 \
+    -SendClipboard=0 \
+    "127.0.0.1::${host_port}" \
+    >/dev/null 2>&1 &
 }
 
 enter_lab() {
-  if ! container_exists; then
-    printf '%s\n' "Run 'spider-security-lab setup' first."
+  if ! lab_ready; then
+    printf '%s\n' "Run 'spider-security-lab setup default' first."
     exit 1
   fi
-  podman start "$container_name" >/dev/null
-  podman exec -it "$container_name" bash
+  ensure_running
+  podman exec -it -u kali "$container_name" bash -l
+}
+
+stop_lab() {
+  if ! container_exists; then
+    printf '%s\n' "Kali Bay is not installed."
+    return 0
+  fi
+  podman exec -u kali "$container_name" tigervncserver -kill :1 >/dev/null 2>&1 || true
+  podman stop "$container_name" >/dev/null
+  printf '%s\n' "Kali Bay stopped."
+}
+
+status_lab() {
+  if ! container_exists; then
+    printf '%s\n' "Kali Bay is not installed."
+    return 0
+  fi
+  podman ps --all --filter "name=$container_name"
+  if lab_ready; then
+    printf '%s\n' "Profile: $(installed_profile)" "Viewer: 127.0.0.1:${host_port} (loopback only)"
+  else
+    printf '%s\n' "State: incomplete setup"
+  fi
 }
 
 reset_lab() {
   if ! container_exists; then
-    printf '%s\n' "The Security Lab does not exist."
-    exit 0
+    printf '%s\n' "Kali Bay container does not exist."
+    return 0
   fi
-  printf '%s' "Delete the entire Spider Kali container and its installed tools? Type RESET: "
+  printf '%s' "Rebuild Kali Bay but keep its persistent home volume? Type RESET: "
   read -r answer
-  if [ "$answer" != "RESET" ]; then
+  if [ "$answer" != RESET ]; then
     printf '%s\n' "Reset canceled."
     exit 1
   fi
-  podman rm --force "$container_name"
-  printf '%s\n' "Security Lab container removed."
+  podman rm --force "$container_name" >/dev/null
+  printf '%s\n' "Kali Bay container removed. The persistent home volume was kept."
 }
 
-require_podman
-command_name=help
+purge_lab() {
+  printf '%s' "Delete Kali Bay, its tools, and its persistent home data? Type PURGE: "
+  read -r answer
+  if [ "$answer" != PURGE ]; then
+    printf '%s\n' "Purge canceled."
+    exit 1
+  fi
+  if container_exists; then
+    podman rm --force "$container_name" >/dev/null
+  fi
+  if podman volume exists "$home_volume"; then
+    podman volume rm "$home_volume" >/dev/null
+  fi
+  rm -rf "$state_dir"
+  printf '%s\n' "Kali Bay and its persistent data were removed."
+}
+
+require_command podman "Podman is required but not installed."
+require_command python3 "Python 3 is required but not installed."
+validate_settings
+
+command_name="${1:-help}"
 if [ "$#" -gt 0 ]; then
-  command_name="$1"
   shift
 fi
 
 case "$command_name" in
+  open) open_lab ;;
   setup) setup_lab "$@" ;;
-  enter) enter_lab ;;
-  stop) podman stop "$container_name" ;;
-  status) podman ps --all --filter "name=$container_name" ;;
+  enter|shell) enter_lab ;;
+  stop) stop_lab ;;
+  status) status_lab ;;
   reset) reset_lab ;;
+  purge) purge_lab ;;
   help|-h|--help) usage ;;
   *)
     usage
     exit 2
     ;;
 esac
-
