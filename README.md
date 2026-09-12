@@ -5,15 +5,40 @@ pattern. The host operating system is atomic and rollback-capable. Spider Core,
 the command center, original branding, desktop launchers, and the isolated Kali
 Security Lab are added during the image build.
 
-Ubuntu Studio remains the creative-workflow reference for future audio and
-media configuration. It is not the image base.
+Ubuntu Studio remains the creative-workflow reference for audio and media
+configuration. It is not the image base.
+
+## Spider Creative Studio
+
+Spider OS includes native PipeWire/JACK compatibility, real-time scheduling,
+and Qpwgraph audio routing in the bootc image. Ubuntu packages and repositories
+are deliberately not mixed into the Fedora/Aurora host.
+
+Creative applications are organized into four optional Flatpak packs so the
+installer ISO stays reasonably sized:
+
+- `audio`: Ardour, Audacity, Carla, Hydrogen, and MuseScore
+- `visual`: Krita, GIMP, Inkscape, Blender, darktable, and digiKam
+- `video`: Kdenlive, OBS Studio, and HandBrake
+- `publishing`: Scribus, LibreOffice, and Calibre
+
+Open **Spider Creative Studio** from the KDE application menu, or use:
+
+    spider-creative-pack list
+    spider-creative-pack install audio
+    spider-creative-pack install all
+    spider-creative-pack status all
+
+Applications install per user from Flathub after an explicit pack selection.
+This preserves atomic system updates and avoids silently downloading several
+gigabytes during first login.
 
 ## Build the bootc image
 
 Run this on Aurora, another Universal Blue system, or a Fedora machine with
 Podman:
 
-    ./distro/build-image.sh
+    ./build-image.sh
 
 This produces localhost/spider-os:latest in the root container store and runs
 the bootc image lint check.
@@ -22,14 +47,14 @@ The default base supports Intel and AMD graphics. If the Dell hardware report
 shows a supported NVIDIA GPU, build against Aurora's NVIDIA image instead:
 
     SPIDER_BASE_IMAGE=ghcr.io/ublue-os/aurora-nvidia-open:stable \
-      ./distro/build-image.sh localhost/spider-os:nvidia
+      ./build-image.sh localhost/spider-os:nvidia
 
 Do not choose the NVIDIA variant until the GPU model is known. Older NVIDIA
 cards may need a different driver path.
 
 ## Build the installer ISO
 
-    ./distro/build-iso.sh
+    ./build-iso.sh
 
 The bootc image builder writes the installer artifacts under output. The
 process requires sudo because image assembly needs privileged storage and

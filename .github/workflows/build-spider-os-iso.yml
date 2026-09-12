@@ -8,9 +8,11 @@ on:
       - main
     paths:
       - 'Containerfile'
+      - 'build.sh'
       - 'build-image.sh'
       - 'build-iso.sh'
       - 'build_files/**'
+      - 'image_overlay/**'
       - 'system_files/**'
       - 'src/**'
       - 'disk_config/**'
@@ -22,9 +24,11 @@ on:
       - main
     paths:
       - 'Containerfile'
+      - 'build.sh'
       - 'build-image.sh'
       - 'build-iso.sh'
       - 'build_files/**'
+      - 'image_overlay/**'
       - 'system_files/**'
       - 'src/**'
       - 'disk_config/**'
@@ -103,6 +107,16 @@ jobs:
               exit 1
             fi
           fi
+
+          # The repository root owns current image customizations while the
+          # legacy archive supplies the older complete source tree.
+          install -m 0755 \
+            "$GITHUB_WORKSPACE/build.sh" \
+            "$project_root/build_files/build.sh"
+          if [ -d "$GITHUB_WORKSPACE/image_overlay" ]; then
+            cp -a "$GITHUB_WORKSPACE/image_overlay/." "$project_root/"
+          fi
+
           echo "Using Spider OS source tree: $project_root"
           echo "PROJECT_ROOT=$project_root" >> "$GITHUB_ENV"
 
@@ -117,6 +131,7 @@ jobs:
           test -d "$PROJECT_ROOT/system_files"
           test -d "$PROJECT_ROOT/src/spider_os"
           bash -n "$GITHUB_WORKSPACE/tools/repair-installer-iso.sh"
+          bash "$GITHUB_WORKSPACE/tools/validate-creative-packs.sh" "$PROJECT_ROOT"
           while IFS= read -r script; do
             bash -n "$script"
           done < <(find "$PROJECT_ROOT" -type f -name '*.sh' -print)
