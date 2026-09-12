@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Webbie Resident
+Comment=Keep Webbie active in the KDE Plasma session
+Exec=systemctl --user start spider-ai-resident.service
+Icon=spider-os
+Terminal=false
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=1
+X-GNOME-Autostart-enabled=true

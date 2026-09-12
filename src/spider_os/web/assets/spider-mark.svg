@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Spider OS mark">
+  <title>Spider OS</title>
+  <g fill="none" stroke="#DC143C" stroke-width="22" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="m229 221-55-57-104-8-21-91 149-29"/>
+    <path d="m218 239-68-25-88 38-14-88"/>
+    <path d="m216 259-78 44 37 106 47 75"/>
+    <path d="m229 276-45 48 21 91 39 74"/>
+    <path d="m283 221 55-57 104-8 21-91-149-29"/>
+    <path d="m294 239 68-25 88 38 14-88"/>
+    <path d="m296 259 78 44-37 106-47 75"/>
+    <path d="m283 276 45 48-21 91-39 74"/>
+  </g>
+  <path fill="#DC143C" d="M232 211c-10-15-8-31 5-42l7 22 12-18 12 18 7-22c13 11 15 27 5 42 18 13 27 36 24 61l-12 100c-4 35-17 63-36 86-19-23-32-51-36-86l-12-100c-3-25 6-48 24-61Z"/>
+</svg>

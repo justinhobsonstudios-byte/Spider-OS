@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070708">
+    <meta name="description" content="The Web — the whole-life desktop of Spider OS">
+    <title>The Web · Spider OS</title>
+    <link rel="icon" href="/assets/spider-mark.svg" type="image/svg+xml">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="boot-screen" id="bootScreen">
+      <div class="boot-stage">
+        <div class="web-assembly" aria-hidden="true">
+          <span class="web-thread t1"></span>
+          <span class="web-thread t2"></span>
+          <span class="web-thread t3"></span>
+          <span class="web-thread t4"></span>
+          <span class="web-thread t5"></span>
+          <span class="web-thread t6"></span>
+          <span class="web-thread t7"></span>
+          <span class="web-thread t8"></span>
+          <span class="web-ring r1"></span>
+          <span class="web-ring r2"></span>
+          <img src="/assets/spider-mark.svg" class="boot-emblem" alt="">
+        </div>
+        <div class="boot-identity">
+          <strong>SPIDER OS</strong>
+          <span>YOUR LIFE. ONE WEB.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-shell" id="appShell" hidden>
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <img src="/assets/spider-mark.svg" alt="" class="brand-mark">
+          <div>
+            <strong>THE WEB</strong>
+            <span>SPIDER OS · YOUR LIFE. ONE WEB.</span>
+          </div>
+        </div>
+
+        <button class="new-button" id="newItemButton" type="button">
+          <span>＋</span> New thread
+        </button>
+
+        <nav class="space-navigation" aria-label="Anchors">
+          <p class="nav-label">Anchors</p>
+          <div id="spaceNav"></div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="system-dot" id="systemDot"></div>
+          <div>
+            <strong id="systemStatus">Core online</strong>
+            <span id="aiStatus">Checking local AI</span>
+          </div>
+          <button class="icon-button" id="openAudit" type="button" aria-label="Open activity log">⋯</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="mobile-menu icon-button" id="menuButton" type="button" aria-label="Open menu">☰</button>
+          <div class="page-heading">
+            <span id="pageEyebrow">YOUR LIFE, IN VIEW</span>
+            <h1 id="pageTitle">Today</h1>
+          </div>
+          <label class="global-search">
+            <span aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" placeholder="Search every thread" autocomplete="off">
+          </label>
+          <div class="clock">
+            <strong id="clockTime">--:--</strong>
+            <span id="clockDate">Loading date</span>
+          </div>
+        </header>
+
+        <div class="content-grid">
+          <section class="workspace" id="workspace" aria-live="polite"></section>
+
+          <aside class="assistant-panel">
+            <div class="assistant-heading">
+              <div class="ai-orb" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div>
+                <span>LOCAL INTELLIGENCE</span>
+                <h2>Webbie</h2>
+              </div>
+              <div class="privacy-pill">Private</div>
+            </div>
+
+            <div class="assistant-feed" id="assistantFeed">
+              <article class="assistant-message">
+                <span class="message-label">WEBBIE</span>
+                <p>I can help connect the pieces without confusing one part of your life for the whole thing. A surprisingly advanced concept.</p>
+              </article>
+            </div>
+
+            <div class="quick-prompts" id="quickPrompts">
+              <button type="button" data-prompt="What should I focus on today?">Plan my day</button>
+              <button type="button" data-prompt="What is due or waiting across my anchors?">Find loose ends</button>
+              <button type="button" data-prompt="Help me break my most important task into steps.">Break down a task</button>
+            </div>
+
+            <form class="assistant-composer" id="assistantForm">
+              <textarea id="assistantInput" rows="1" placeholder="Ask Webbie…" aria-label="Message Webbie"></textarea>
+              <button type="submit" aria-label="Send message">↑</button>
+            </form>
+            <p class="assistant-note">Routine local actions may run automatically. Sensitive changes still require approval.</p>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <button class="web-edge-orb" id="webEdgeOrb" type="button" aria-label="Open Webbie" title="Webbie · resident intelligence">
+      <img src="/assets/spider-mark.svg" alt="">
+      <span class="web-presence-ring" aria-hidden="true"></span>
+      <span class="web-privacy-dot" aria-label="Screen awareness active"></span>
+    </button>
+
+    <dialog id="itemDialog" class="modal">
+      <form method="dialog" id="itemForm">
+        <div class="modal-heading">
+          <div>
+            <span>NEW THREAD</span>
+            <h2>Add something that matters</h2>
+          </div>
+          <button class="icon-button" value="cancel" formnovalidate aria-label="Close">×</button>
+        </div>
+        <label>
+          Anchor
+          <select id="itemSpace" required></select>
+        </label>
+        <div class="form-row">
+          <label>
+            Type
+            <select id="itemKind">
+              <option value="task">Task</option>
+              <option value="note">Note</option>
+              <option value="project">Project</option>
+              <option value="event">Event</option>
+              <option value="checkin">Check-in</option>
+            </select>
+          </label>
+          <label>
+            Privacy
+            <select id="itemSensitivity">
+              <option value="standard">Standard</option>
+              <option value="private">Private</option>
+              <option value="restricted">Restricted</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Title
+          <input id="itemTitle" required maxlength="180" placeholder="What needs a place?">
+        </label>
+        <label>
+          Details
+          <textarea id="itemBody" rows="5" maxlength="8000" placeholder="Notes, context, next steps…"></textarea>
+        </label>
+        <div class="form-row">
+          <label>
+            Due
+            <input id="itemDue" type="datetime-local">
+          </label>
+          <label>
+            Priority
+            <select id="itemPriority">
+              <option value="1">Low</option>
+              <option value="2" selected>Normal</option>
+              <option value="3">High</option>
+              <option value="4">Critical</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="button-secondary" value="cancel" formnovalidate>Cancel</button>
+          <button class="button-primary" id="saveItemButton" type="submit">Add thread</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="auditDialog" class="modal wide-modal">
+      <div class="modal-heading">
+        <div>
+          <span>TRANSPARENCY</span>
+          <h2>Activity log</h2>
+        </div>
+        <button class="icon-button" id="closeAudit" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="auditList" class="audit-list"></div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
+

@@ -1,0 +1,17 @@
+{
+  "name": "The Web \u00b7 Spider OS",
+  "short_name": "The Web",
+  "description": "The whole-life desktop of Spider OS, with Webbie as its resident AI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070708",
+  "theme_color": "#070708",
+  "icons": [
+    {
+      "src": "/assets/spider-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

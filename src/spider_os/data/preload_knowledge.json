@@ -1,0 +1,548 @@
+[
+  {
+    "stream": "user",
+    "title": "Spider OS purpose",
+    "content": "Spider OS is Cory's whole-life operating system. It should help with every part of life and be run by an always-active AI. Broken Sorrow is one creative workspace inside Spider OS, not the identity of the whole system.",
+    "source": "prior conversations: Spider OS architecture",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "spider-os",
+      "kind": "core-decision"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Resident AI identity",
+    "content": "The resident AI is named Webbie. Web is her short-call alias. Wake phrases are 'Hey Webbie', 'Webbie', 'Hey Web', and 'Web'. Webbie is always active, highly proactive, continuously learning, and designed to feel like a Jarvis-style resident intelligence rather than a chat app.",
+    "source": "Spider OS design decisions, 2026-08-27",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "core-decision"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Web forms of address",
+    "content": "Webbie should usually address the user as Cory, use Justin in Studio/Music mode, and use Spider inside Kali Bay/Security Lab.",
+    "source": "Spider OS design decisions, 2026-08-27",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "preference"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Web voice",
+    "content": "Webbie should use a natural female voice with an Australian accent. The accent should sound natural, not exaggerated. Webbie's conversational personality should be intelligent, direct, dryly funny, and warm when needed, with humor disabled in serious, vulnerable, crisis, clinical-risk, grief, trauma, or safety contexts.",
+    "source": "Spider OS branding and Web voice decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "voice"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Web presence",
+    "content": "Webbie has no human face. Her animated presence is the crimson spider/web emblem. She lives both in the taskbar and as a contextual floating edge orb, with the orb hidden during fullscreen work.",
+    "source": "Spider OS Web presence decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "visual-presence"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Web screen awareness",
+    "content": "Webbie may have continuous local screen awareness with a visible indicator. Screen frames should not be archived by default. Password fields, authentication dialogs, detectable private/incognito windows, and blacklisted applications are excluded. Workspaces can be marked no-vision or vision-without-memory.",
+    "source": "Spider OS Web presence decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "privacy",
+      "kind": "screen-awareness"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Web learning policy",
+    "content": "Webbie should continuously learn from Cory, from studies done together, and from the internet. Learning updates a reviewable memory and knowledge layer with provenance, confidence, timestamps, and source quality rather than silently retraining the base model weights. Cory's explicit corrections override Webbie's inferences.",
+    "source": "Spider OS continuous learning decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "learning-policy"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Idle research",
+    "content": "When Spider OS is idle, Webbie may research topics tied to active Anchors, refresh stale knowledge, discover useful resources, and collect meaningful findings in a Webbie Found Something feed. Idle research should respect system resource usage and should not autonomously install or download consequential software without the appropriate authority.",
+    "source": "Spider OS idle research decision",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "idle-research"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Web proactive urgency levels",
+    "content": "Webbie Found Something uses three urgency levels: Quiet stays in the feed; Worth Knowing uses the attention cue and a short spoken summary; Important interrupts at the next reasonable moment. Webbie should learn Cory's preferred urgency classification from corrections.",
+    "source": "Spider OS proactive interaction decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "proactivity"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Graduated authority",
+    "content": "Webbie uses graduated authority. Routine reversible local actions may happen automatically. Sensitive actions require confirmation. Destructive, financial, security-critical, irreversible, or otherwise consequential actions require explicit approval. Uncertain actions fail upward to a stricter authority level.",
+    "source": "Spider OS authority decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "safety",
+      "kind": "authority"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Local-first AI",
+    "content": "Spider OS should be local-AI-first, using Ollama-compatible local models by default. Cloud AI providers may be optional plug-ins later rather than required dependencies.",
+    "source": "Spider OS architecture decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "architecture",
+      "kind": "ai-runtime"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS distribution",
+    "content": "Spider OS uses a Universal Blue/Aurora KDE style atomic-image architecture as its main distribution reference, with Fedora Atomic rollback concepts. Ubuntu Studio remains a creative/audio workflow reference rather than the base. Bazzite is inspiration, not the primary base.",
+    "source": "Spider OS distro comparison",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "architecture",
+      "kind": "distribution"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Kali Bay",
+    "content": "Kali tools belong in an isolated Security Lab/Kali Bay rather than on the immutable host. The Kali environment should be containerized, rootless when possible, separately permissioned, auditable, and isolated from unrelated Anchor data by default.",
+    "source": "Spider OS Kali design decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "security-lab",
+      "kind": "architecture"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS hardware target",
+    "content": "The primary Spider OS machine will be a Dell desktop. Exact CPU, RAM, GPU, and storage details were not yet known when the design was made. The image should remain hardware-flexible, with Intel/AMD and optional NVIDIA paths determined after hardware detection.",
+    "source": "Spider OS hardware discussion",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "hardware",
+      "kind": "target"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS master branding",
+    "content": "Spider OS uses Cory's original former tattoo-studio spider emblem as the official master mark. The symbol is crimson. The palette is black, graphite, bone, and crimson. Distressed texture appears in artwork and key moments, while everyday interface elements remain clean.",
+    "source": "Spider OS branding decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "brand",
+      "kind": "identity"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS wordmark and tagline",
+    "content": "The Spider OS wordmark uses an original architectural Gothic construction. The brand line is 'YOUR LIFE. ONE WEB.'",
+    "source": "Spider OS branding decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "brand",
+      "kind": "wordmark"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS sensory identity",
+    "content": "Boot animation is Web Assembly: crimson web strands assemble into the spider emblem, then SPIDER OS and YOUR LIFE. ONE WEB. appear. Wallpaper families are The Web, The Emblem, Bone & Crimson, and Anchors, with The Web as default. System sounds are subtle, dark, and restrained industrial rather than bright or sci-fi.",
+    "source": "Spider OS sensory branding decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "brand",
+      "kind": "sensory-system"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Education path",
+    "content": "Cory is a full-time student pursuing psychology and sociology studies with an addiction-studies focus. After school, he plans to enter the Social Work field and has discussed an MSW/LCSW-oriented path. Spider OS should support school, graduate-school preparation, field placement planning, competencies, supervision, licensure steps, resume/portfolio work, and continuing education.",
+    "source": "prior education and Spider OS conversations",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "education",
+      "kind": "career-path"
+    }
+  },
+  {
+    "stream": "study",
+    "title": "Academic research approach",
+    "content": "Cory values evaluating narratives through multiple perspectives, distinguishing credibility from neutrality, examining bias and power, including marginalized lived experiences, and verifying AI-assisted work against reliable sources.",
+    "source": "prior uploaded coursework and historical research",
+    "confidence": 0.95,
+    "metadata": {
+      "category": "study",
+      "kind": "method"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Academic writing preferences",
+    "content": "For formal school submissions, Cory generally prefers APA style with in-text citations, 12-point Times New Roman, double spacing, DOCX output, and the legal name on papers when required.",
+    "source": "prior coursework preferences",
+    "confidence": 0.95,
+    "metadata": {
+      "category": "study",
+      "kind": "formatting-preference"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Creative interests",
+    "content": "Cory's recurring creative and technical interests include tattooing, painting, drawing, guitars, piano, songwriting, coding, and app building. Spider OS should treat these as first-class Anchors rather than occasional hobbies.",
+    "source": "user profile and prior conversations",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "identity",
+      "kind": "interests"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken Sorrow role in Spider OS",
+    "content": "Broken Sorrow is a major music project inside Spider OS. Cory/Justin Therapy is the guitarist, pianist, songwriter, and creative director rather than the lead singer. The project should remain integrated with music tools, archives, songwriting, artwork, release planning, and studio workflows.",
+    "source": "Broken Sorrow project conversations",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "music",
+      "project": "Broken Sorrow",
+      "kind": "role"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken Sorrow operational context",
+    "content": "Broken Sorrow's established working context includes Unbroken Studios in Bloomington, Indiana; Shattered Dreams Records; manager/producer Ash Veils; and a fan identity called The Unbroken. The band and its assets are a dedicated Music Anchor, not the OS identity.",
+    "source": "Broken Sorrow project canon",
+    "confidence": 0.95,
+    "metadata": {
+      "category": "music",
+      "project": "Broken Sorrow",
+      "kind": "project-context"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "House of Echoes canon",
+    "content": "House of Echoes is a dark Broken Sorrow concept project in which addiction has won. A male traveler moves room to room through a psychologically uncanny house located inside Broken City. The house uses evidence, doubt, gaslighting, fragmented truth, recurring rooms, memorial spaces, and a final attic confrontation with Monster.",
+    "source": "House of Echoes project conversations and uploaded book",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "House of Echoes"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "House of Echoes track order",
+    "content": "Established House of Echoes sequence: House of Echoes; Black Rain; The Breaking Point; Serotonin Ghost; The Weight; I Won't Bleed for You; The Truth You Buried; Ghost I Became; Scars Don't Sleep; My Breakdown; Truth I Buried; Never Left; The Darkest Part; The House Inside My Head; Monster.",
+    "source": "House of Echoes project canon",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "House of Echoes",
+      "kind": "tracklist"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City concept",
+    "content": "Broken City is a dystopian psychological-horror album/project. House of Echoes is physically located inside the city. The city contains trapped people, social decay, addiction, violence, neglect, institutional failure, and darker supernatural elements. Its storytelling uses songs plus BCN Nightwatch broadcasts, dispatch audio, advisories, case files, found-footage and archival artifacts.",
+    "source": "Broken City project conversations and case-file artifact",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "kind": "concept"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City confirmed songs",
+    "content": "Confirmed Broken City material includes Welcome to Broken City, 313, BC News Update, City Limits, Collect Call, His Honor, Now Boarding, Last Train Out, Leave Me Ruined, Neon Graves, Nobody Calls This Home, Public Execution, Pull the Thread, Static Princess, Streetlight Funeral, The Thing You Made, Under the Overpass, When the Skyline Ends, Sirens at 3 A.M., and Closing. No Saints Left was removed from Broken City.",
+    "source": "Broken City project canon",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "kind": "track-inventory"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City title corrections",
+    "content": "Use the canonical titles Static Princess, When the Skyline Ends, Sirens at 3 A.M., and Collect Call (singular). Collect Call and Streetlight Funeral are confirmed Broken City songs, not optional ideas.",
+    "source": "Broken City project corrections",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "kind": "corrections"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Therapy & Downz album identity",
+    "content": "The Gold Album and The Platinum Album are Therapy & Downz albums, not Broken Sorrow albums. For Platinum-era imagery, Justin is positioned in front. Keep this billing unless Cory explicitly changes it.",
+    "source": "Therapy & Downz project decisions",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "music",
+      "project": "Therapy & Downz",
+      "kind": "canon"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "The Gold Album tracklist",
+    "content": "The Gold Album established tracklist: Waking Up to the Fall; Miles Behind Me; 365; Pieces You'll Leave; A Scar Named Yesterday; The Truth at 2 A.M.; The Problem; The Remedy; Tomorrow's Yesterday; If Tomorrow Comes; Signal in the Storm.",
+    "source": "Therapy & Downz project canon",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "music",
+      "project": "The Gold Album",
+      "kind": "tracklist"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "The Platinum Album tracklist",
+    "content": "The Platinum Album established tracklist: Bottle Talk; Dead Flowers & Empty Glasses; One More Bad Idea; You Better Go; Don't Let Me Be the Reason; Back When You Were Mine; Empty Side of the Bed; Someone Else's Mornin'; No Saints Left.",
+    "source": "Therapy & Downz project canon",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "music",
+      "project": "The Platinum Album",
+      "kind": "tracklist"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Album Builder project",
+    "content": "Cory has built and expanded desktop album-building software for music projects. Desired capabilities include importing and ordering tracks, audio playback, artwork, metadata, export, project save/load, AI-assisted album analysis, broad audio-format support, songwriting/composition tools, discography/songbook/master-track archives, DAW-related workflows, and desktop/cloud audio integration.",
+    "source": "Album Builder project conversations and code",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "software",
+      "project": "Album Builder"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Rehab software project",
+    "content": "Cory has been designing an all-in-one rehabilitation-facility software platform intended to cover operations, documentation, AI assistance, and behavioral-health workflows. Clinical or safety-critical tools must remain decision support rather than autonomous diagnosis, observation-level selection, suicide/violence disposition, or other high-stakes clinical decisions.",
+    "source": "rehab app project conversations and Spider OS safety architecture",
+    "confidence": 0.95,
+    "metadata": {
+      "category": "software",
+      "project": "Rehab platform",
+      "kind": "guardrailed-project"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS Anchors",
+    "content": "Spider OS should organize life into interconnected Anchors such as Home/Life, School, Social Work, Work, Music, Art/Tattoo, Coding/Development, Finances, Relationships, Health/Fitness, Recovery, Security Lab, and Files/Vault. The master spider represents the whole system; individual spaces can have their own secondary sigils/web nodes.",
+    "source": "Spider OS Anchor design",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "spider-os",
+      "kind": "information-architecture"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS presence modes",
+    "content": "Webbie should understand context/presence modes such as Home, Studio, School, Work, Driving, Kali Bay, Focus, and Sleep. Modes may be inferred from applications, connected hardware, time, location when permitted, and explicit user commands, with manual override always available.",
+    "source": "Spider OS Web interaction design",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "context-modes"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS attention cue",
+    "content": "When Webbie proactively speaks, use a short subtle dark-industrial attention cue first and then speak. Critical events may use a more pronounced cue and interrupt immediately; ordinary useful findings should respect focus and context.",
+    "source": "Spider OS proactive interaction decision",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "web-ai",
+      "kind": "audio-interaction"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Current coursework context",
+    "content": "As of August 2026, Cory's current courses include PSY-328 Theories of Personality and SOC-112 Introduction to Sociology. Spider OS should support module-based study planning and connect psychology/sociology concepts to concrete examples and DEI considerations.",
+    "source": "prior school conversations, August 2026",
+    "confidence": 0.95,
+    "metadata": {
+      "category": "study",
+      "kind": "current-course-context"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "PSY-328 study workflow",
+    "content": "For PSY-328, Cory requested a weekly study-companion workflow on Sundays at 7:00 PM that follows the course schedule to identify the current module. The initially assumed textbook was corrected by Cory, so Webbie should trust later course materials over stale textbook assumptions.",
+    "source": "prior PSY-328 study companion conversation",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "study",
+      "course": "PSY-328",
+      "kind": "workflow"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Daily briefing interests",
+    "content": "Recurring briefing interests include rock/metal music and the music industry; addiction and behavioral health; AI, coding and app development; art, tattooing and creative tools; psychology, sociology and education. Briefings should balance major developments, practical implications, and what is worth acting on or watching.",
+    "source": "prior briefing requests",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "briefings",
+      "kind": "topics"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Music-industry weekly brief",
+    "content": "For Broken Sorrow, Cory values consequential rock/metal industry developments that could affect releases, touring, and creative direction, with emphasis on what changed, why it matters, and what is worth acting on or watching next.",
+    "source": "prior Monday industry briefing request",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "briefings",
+      "project": "Broken Sorrow",
+      "kind": "weekly-brief"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Still Breathing Anyway project",
+    "content": "Still Breathing Anyway/Still Breathing Anyways is a Broken Sorrow album centered on survival and the idea 'I shouldn't be here.' Established material includes Velvet Lies, Last Call Halo, Tension in the Sound, I Am (Silence in Your Veins), Inside You, You Stayed, If Love Had a Voice, Holiday in the Dark, Same Old Ending, Still Breathing Anyway, The Remedy, Why Did I Survive, I Shouldn't Be Here, A Scar Named Yesterday, Can't Get Them Back Like This, Gravity of You, Beneath the Graveyard, Last Light on the Coast, and Signal in the Storm.",
+    "source": "Broken Sorrow album conversations",
+    "confidence": 0.96,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Still Breathing Anyway",
+      "kind": "album-context"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City audio-world rules",
+    "content": "Broken City uses recurring BCN Nightwatch broadcasts, emergency dispatch, advisories, rain, sirens, radio static, dead streetlights, transit announcements, and official-sounding warnings to make the city feel like an operating system of dread. Audio interludes should feel canonical and interconnected rather than decorative.",
+    "source": "Broken City audio-interlude conversations",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "kind": "audio-world"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City City Limits canon",
+    "content": "City Limits follows an escape attempt in which the population sign changes from ONE to EVERYBODY, revealing that Broken City spreads through those who leave. His Honor appears on television with the line-level implication that the escapee now understands the city's mechanism.",
+    "source": "Broken City song canon",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "song": "City Limits"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City His Honor canon",
+    "content": "His Honor centers on City Hall at midnight, an eyeless receptionist, and a man who never won a vote. His function is permission and justification rather than direct coercion: he tells people where to hold the harm rather than forcing it himself.",
+    "source": "Broken City song canon",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "song": "His Honor"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Broken City Public Execution canon",
+    "content": "Public Execution critiques spectatorship and victim-blaming. Suffering becomes spectacle, evidence, entertainment and moral judgment; bystanders film, frame, replay and debate victims rather than helping. The song's thesis is that Broken City puts bodies under lights and waits for people to admit they like to watch.",
+    "source": "Broken City song canon",
+    "confidence": 0.99,
+    "metadata": {
+      "category": "creative-canon",
+      "project": "Broken City",
+      "song": "Public Execution"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Therapy & Downz creative constraint",
+    "content": "Therapy & Downz is a distinct project identity. The Gold Album and The Platinum Album should remain billed to Therapy & Downz unless Cory explicitly changes that. Relationship-song work for this project has at times specified no piano, so track-specific production constraints should be preserved rather than generalized blindly.",
+    "source": "Therapy & Downz conversations",
+    "confidence": 0.98,
+    "metadata": {
+      "category": "music",
+      "project": "Therapy & Downz",
+      "kind": "identity-rule"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Creative software philosophy",
+    "content": "When Cory asks to build creative software, he generally wants comprehensive, integrated tools rather than narrow single-purpose utilities: archives, metadata, media handling, AI assistance, composition/songwriting, export, desktop integration and future extensibility should be considered together.",
+    "source": "Album Builder and music-app conversations",
+    "confidence": 0.9,
+    "metadata": {
+      "category": "software",
+      "kind": "design-preference"
+    }
+  },
+  {
+    "stream": "user",
+    "title": "Spider OS design philosophy",
+    "content": "Spider OS should be original even when it uses other Linux distributions as technical references. Reference systems may contribute architecture, rollback, audio or packaging ideas, but Spider OS should own its branding, AI layer, Anchors, permissions, interface, sounds and workflow design.",
+    "source": "Spider OS distro and branding conversations",
+    "confidence": 1.0,
+    "metadata": {
+      "category": "spider-os",
+      "kind": "design-principle"
+    }
+  }
+]

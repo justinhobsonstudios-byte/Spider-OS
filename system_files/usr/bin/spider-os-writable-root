@@ -1,0 +1,20 @@
+#!/bin/bash
+set -euo pipefail
+
+# bootc/OSTree deliberately ships /usr read-only.  Spider OS opts into OSTree's
+# persistent hotfix overlay so the owner can use rpm/dnf and edit system files.
+# A later bootc deployment replaces this overlay and restores a clean rollback
+# point, which is considerably less reckless than abandoning deployments.
+if [ -w /usr ]; then
+  exit 0
+fi
+
+if [ ! -e /run/ostree-booted ]; then
+  echo "Spider OS writable mode requires an OSTree/bootc deployment." >&2
+  exit 0
+fi
+
+/usr/bin/ostree admin unlock --hotfix
+install -d -m 0755 /var/lib/spider-os
+touch /var/lib/spider-os/writable-system-enabled
+

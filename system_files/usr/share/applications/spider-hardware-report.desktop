@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Spider OS Hardware Report
+Comment=Show the hardware details needed to tune Spider OS
+Exec=konsole --hold -e spider-hardware-report
+Icon=computer
+Terminal=false
+Categories=System;
+
