@@ -1,9 +1,6 @@
 name: Clean Actions artifacts
 
 on:
-  push:
-    paths:
-      - ".github/workflows/cleanup-artifacts.yml"
   workflow_dispatch:
     inputs:
       keep_days:
@@ -23,7 +20,7 @@ jobs:
     name: Remove disposable Actions artifacts
     runs-on: ubuntu-latest
     env:
-      SCHEDULE_KEEP_DAYS: "0"
+      SCHEDULE_KEEP_DAYS: "3"
     steps:
       - name: Delete expired and old artifacts
         uses: actions/github-script@v7
