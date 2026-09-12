@@ -48,7 +48,7 @@ jobs:
             for (const artifact of artifacts) {
               const created = Date.parse(artifact.created_at);
               if (!artifact.expired && created >= cutoff) continue;
-              await github.rest.actions.deleteArtifactForRepo({
+              await github.rest.actions.deleteArtifact({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 artifact_id: artifact.id,
