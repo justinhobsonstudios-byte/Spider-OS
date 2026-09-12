@@ -37,6 +37,7 @@ jobs:
         with:
           name: release-dists
           path: dist/
+          retention-days: 3
 
   pypi-publish:
     runs-on: ubuntu-latest
