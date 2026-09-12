@@ -1,0 +1,57 @@
+name: Clean Actions artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_days:
+        description: "Keep artifacts newer than this many days; 0 deletes all artifacts"
+        required: false
+        default: "0"
+        type: string
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    name: Remove disposable Actions artifacts
+    runs-on: ubuntu-latest
+    env:
+      SCHEDULE_KEEP_DAYS: "3"
+    steps:
+      - name: Delete expired and old artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const requested = core.getInput("keep_days") || process.env.SCHEDULE_KEEP_DAYS;
+            const keepDays = Number.parseInt(requested, 10);
+            if (!Number.isInteger(keepDays) || keepDays < 0) {
+              core.setFailed("keep_days must be a non-negative integer");
+              return;
+            }
+
+            const cutoff = keepDays === 0
+              ? Number.POSITIVE_INFINITY
+              : Date.now() - keepDays * 24 * 60 * 60 * 1000;
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              {owner: context.repo.owner, repo: context.repo.repo, per_page: 100}
+            );
+
+            let deleted = 0;
+            let bytes = 0;
+            for (const artifact of artifacts) {
+              const created = Date.parse(artifact.created_at);
+              if (!artifact.expired && created >= cutoff) continue;
+              await github.rest.actions.deleteArtifactForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+              deleted += 1;
+              bytes += artifact.size_in_bytes || 0;
+              core.info(`Deleted ${artifact.name} (#${artifact.id}, ${artifact.size_in_bytes || 0} bytes)`);
+            }
+            core.notice(`Deleted ${deleted} artifact(s), freeing approximately ${bytes} bytes.`);
