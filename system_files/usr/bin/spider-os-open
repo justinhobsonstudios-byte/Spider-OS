@@ -13,4 +13,4 @@ if [ "$#" -gt 0 ] && [ "$1" = "--session" ]; then
   : > "$marker"
 fi
 
-exec qml6 /usr/share/spider-os/shell/Main.qml
+exec qml-qt6 /usr/share/spider-os/shell/Main.qml
