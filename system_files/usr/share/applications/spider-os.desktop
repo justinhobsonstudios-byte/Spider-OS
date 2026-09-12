@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=The Web
+Comment=Native Spider OS command shell with resident Webbie AI
+Exec=spider-os-open
+Icon=spider-os
+Terminal=false
+Categories=Qt;KDE;Utility;Office;
+StartupNotify=true
+Keywords=AI;Tasks;Life;School;Music;Social Work;

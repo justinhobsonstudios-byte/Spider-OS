@@ -35,7 +35,8 @@ Ubuntu Studio or inherit its branding.
    - Read actions separated from write actions
    - Approval broker for AI-originated changes
 4. Command center
-   - Responsive installable web application
+   - Native Qt Quick desktop shell integrated with KDE Plasma
+   - Optional loopback web UI retained as a compatibility surface, not the desktop shell
    - Today view, anchors, threads, search, projects, check-ins, Web, approvals
 5. Modules
    - Personal
@@ -59,6 +60,21 @@ are assembled as complete images rather than mutating each computer one package
 at a time. A failed update can return to a prior known-good deployment.
 Applications and personal data stay separate from the system image, reducing
 configuration drift.
+
+### Writable owner mode
+
+Spider OS enables an OSTree `--hotfix` overlay at boot. This makes `/usr`
+persistently writable for owner-managed RPMs and system changes while retaining
+the underlying bootc deployment as a rollback point. A new bootc deployment
+replaces the hotfix overlay. This is an intentional Spider OS tradeoff: ordinary
+Aurora atomic guarantees are relaxed in favor of a writable owner system.
+
+## Native KDE shell
+
+The Web is launched by `qml6` as a Qt Quick application. It is no longer opened
+through `xdg-open` or hosted inside the user's browser. The
+`org.spideros.webbie` Plasma 6 applet exposes Webbie's resident status directly
+in KDE, while Spider Core remains a loopback-only data and approval service.
 
 ## Why local first
 

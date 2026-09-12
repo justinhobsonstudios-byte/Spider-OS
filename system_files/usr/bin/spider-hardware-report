@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' "Spider OS hardware report" "========================="
+printf 'Kernel: '
+uname -srmo
+
+printf '\nCPU\n---\n'
+if command -v lscpu >/dev/null 2>&1; then
+  lscpu | awk -F: '
+    /Model name|Socket|Core.s. per socket|Thread.s. per core|Architecture/ {
+      gsub(/^[ \t]+|[ \t]+$/, "", $1)
+      gsub(/^[ \t]+|[ \t]+$/, "", $2)
+      print $1 ": " $2
+    }'
+fi
+
+printf '\nMemory\n------\n'
+if command -v free >/dev/null 2>&1; then
+  free -h | awk 'NR == 1 || /^Mem:/'
+fi
+
+printf '\nGraphics and network\n--------------------\n'
+if command -v lspci >/dev/null 2>&1; then
+  lspci | grep -Ei 'vga|3d|display|ethernet|network|audio' || true
+fi
+
+printf '\nStorage\n-------\n'
+if command -v lsblk >/dev/null 2>&1; then
+  lsblk -d -o NAME,SIZE,TYPE,TRAN,ROTA,MODEL
+fi
+
+printf '\nNo serial numbers or service tags are included.\n'
+

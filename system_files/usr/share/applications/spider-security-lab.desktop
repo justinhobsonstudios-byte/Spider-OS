@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Kali Bay
+Comment=Open the isolated Kali security environment
+Exec=konsole -e spider-security-lab enter
+Icon=utilities-terminal
+Terminal=false
+Categories=Development;System;Security;
+Keywords=Kali;Security;Pentest;Lab;
+

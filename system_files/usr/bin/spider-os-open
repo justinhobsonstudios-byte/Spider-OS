@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+systemctl --user start spider-os.service spider-ai-resident.service 2>/dev/null || true
+
+if [ "$#" -gt 0 ] && [ "$1" = "--session" ]; then
+  marker_dir="$HOME/.config/spider-os"
+  marker="$marker_dir/session-opened"
+  mkdir -p "$marker_dir"
+  if [ -f "$marker" ]; then
+    exit 0
+  fi
+  : > "$marker"
+fi
+
+exec qml-qt6 /usr/share/spider-os/shell/Main.qml

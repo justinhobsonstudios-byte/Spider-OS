@@ -1,0 +1,14 @@
+[Unit]
+Description=Enable Spider OS persistent writable system overlay
+Documentation=man:ostree-admin-unlock(1)
+ConditionPathExists=/run/ostree-booted
+Before=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/spider-os-writable-root
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

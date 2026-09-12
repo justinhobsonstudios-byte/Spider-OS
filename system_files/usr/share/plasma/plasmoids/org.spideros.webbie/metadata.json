@@ -1,0 +1,14 @@
+{
+  "KPlugin": {
+    "Id": "org.spideros.webbie",
+    "Name": "Webbie",
+    "Description": "Resident Spider OS intelligence status",
+    "Icon": "spider-os",
+    "Version": "1.0.0",
+    "License": "MIT",
+    "Category": "System Information"
+  },
+  "KPackageStructure": "Plasma/Applet",
+  "X-Plasma-API-Minimum-Version": "6.0"
+}
+
