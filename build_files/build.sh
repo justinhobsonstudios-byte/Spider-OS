@@ -17,9 +17,10 @@ dnf5 install -y \
   podman \
   python3 \
   qt6-qtdeclarative \
+  qt6-qtdeclarative-devel \
   qt6-qtwayland
 
-# Install the native RPM build of VS Code.  Keeping the repository definition
+# Install the native RPM build of VS Code. Keeping the repository definition
 # in the image lets normal dnf/rpm tooling repair or update Code in writable
 # mode instead of relying on a browser launcher or a per-user download.
 rpm --import https://packages.microsoft.com/keys/microsoft.asc
@@ -28,7 +29,9 @@ install -m 0644 /ctx/system_files/etc/yum.repos.d/vscode.repo \
   /etc/yum.repos.d/vscode.repo
 dnf5 install -y code
 
-command -v qml6 >/dev/null
+# Fedora names the Qt 6 QML runner qml-qt6. Validate the exact executable that
+# spider-os-open launches so CI catches a broken native shell before ISO build.
+command -v qml-qt6 >/dev/null
 command -v code >/dev/null
 
 chmod 0755 \
