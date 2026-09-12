@@ -16,6 +16,15 @@ Ubuntu Studio remains a workflow reference for audio, PipeWire/JACK,
 low-latency configuration, and curated creative tools. Spider OS does not clone
 Ubuntu Studio or inherit its branding.
 
+### Creative workstation layer
+
+The host image supplies PipeWire's JACK compatibility layer, RtKit scheduling,
+and Qpwgraph routing. Creative desktop applications remain outside the atomic
+deployment as per-user Flatpaks grouped into audio, visual, video, and
+publishing packs. The `spider-creative-pack` installer performs the explicit,
+reviewable installation from Flathub. Ubuntu APT repositories are never added
+to the Fedora host.
+
 ## Layers
 
 1. Atomic Linux foundation

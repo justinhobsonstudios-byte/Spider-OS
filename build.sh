@@ -14,13 +14,17 @@ dnf5 install -y \
   curl \
   distrobox \
   podman \
-  python3
+  python3 \
+  pipewire-jack-audio-connection-kit \
+  qpwgraph \
+  rtkit
 
 chmod 0755 \
   /usr/bin/spider-os \
   /usr/bin/spider-os-open \
   /usr/bin/spider-os-first-login \
   /usr/bin/spider-hardware-report \
+  /usr/bin/spider-creative-pack \
   /usr/bin/spider-security-lab
 
 systemctl --global enable spider-os.service

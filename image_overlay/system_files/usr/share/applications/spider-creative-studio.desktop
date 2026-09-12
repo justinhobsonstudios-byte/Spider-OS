@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Spider Creative Studio
+Comment=Install and inspect Spider OS creative application packs
+Exec=spider-creative-pack gui
+Icon=spider-os
+Terminal=false
+Categories=AudioVideo;Graphics;Utility;
+Keywords=audio;music;art;tattoo;video;writing;publishing;studio;
+StartupNotify=true

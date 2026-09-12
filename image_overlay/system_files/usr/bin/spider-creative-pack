@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly PACK_DIR="${SPIDER_CREATIVE_PACK_DIR:-/usr/share/spider-os/creative-packs}"
+readonly FLATHUB_URL="https://dl.flathub.org/repo/flathub.flatpakrepo"
+readonly -a PACKS=(audio visual video publishing)
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  spider-creative-pack list
+  spider-creative-pack install <audio|visual|video|publishing|all>
+  spider-creative-pack status [audio|visual|video|publishing|all]
+  spider-creative-pack gui
+USAGE
+}
+
+pack_description() {
+  case "$1" in
+    audio) printf '%s\n' "Ardour, Audacity, Carla, Hydrogen, MuseScore" ;;
+    visual) printf '%s\n' "Krita, GIMP, Inkscape, Blender, darktable, digiKam" ;;
+    video) printf '%s\n' "Kdenlive, OBS Studio, HandBrake" ;;
+    publishing) printf '%s\n' "Scribus, LibreOffice, Calibre" ;;
+    *) return 1 ;;
+  esac
+}
+
+valid_pack() {
+  local requested="$1"
+  local pack
+  [ "$requested" = all ] && return 0
+  for pack in "${PACKS[@]}"; do
+    [ "$requested" = "$pack" ] && return 0
+  done
+  return 1
+}
+
+read_pack() {
+  local pack="$1"
+  sed \
+    -e 's/[[:space:]]*#.*$//' \
+    -e '/^[[:space:]]*$/d' \
+    "$PACK_DIR/$pack.list"
+}
+
+load_apps() {
+  local requested="$1"
+  local pack
+  if [ "$requested" = all ]; then
+    for pack in "${PACKS[@]}"; do
+      read_pack "$pack"
+    done | sort -u
+  else
+    read_pack "$requested"
+  fi
+}
+
+require_flatpak() {
+  if ! command -v flatpak >/dev/null 2>&1; then
+    printf '%s\n' "Flatpak is unavailable. Run this command from an installed Spider OS desktop." >&2
+    exit 1
+  fi
+}
+
+ensure_flathub() {
+  if ! flatpak remotes --user --columns=name 2>/dev/null | grep -Fxq flathub; then
+    flatpak remote-add --user --if-not-exists flathub "$FLATHUB_URL"
+  fi
+}
+
+list_packs() {
+  local pack
+  for pack in "${PACKS[@]}"; do
+    printf '%-11s %s\n' "$pack" "$(pack_description "$pack")"
+  done
+  printf '%-11s %s\n' all "Every Spider Creative Studio pack"
+}
+
+install_pack() {
+  local requested="$1"
+  local -a apps=()
+  valid_pack "$requested" || {
+    printf 'Unknown creative pack: %s\n' "$requested" >&2
+    usage >&2
+    exit 2
+  }
+  require_flatpak
+  ensure_flathub
+  mapfile -t apps < <(load_apps "$requested")
+  printf 'Installing %s pack (%d applications)...\n' "$requested" "${#apps[@]}"
+  flatpak install --user --noninteractive -y flathub "${apps[@]}"
+  printf '%s\n' "Spider Creative Studio installation complete."
+}
+
+show_status() {
+  local requested="${1:-all}"
+  local app
+  valid_pack "$requested" || {
+    printf 'Unknown creative pack: %s\n' "$requested" >&2
+    exit 2
+  }
+  require_flatpak
+  while IFS= read -r app; do
+    if flatpak info --user "$app" >/dev/null 2>&1; then
+      printf 'installed  %s\n' "$app"
+    else
+      printf 'missing    %s\n' "$app"
+    fi
+  done < <(load_apps "$requested")
+}
+
+show_gui() {
+  if ! command -v kdialog >/dev/null 2>&1 || ! command -v konsole >/dev/null 2>&1; then
+    printf '%s\n' "The graphical selector requires KDE's KDialog and Konsole." >&2
+    exit 1
+  fi
+
+  local selection
+  selection="$(kdialog \
+    --title "Spider Creative Studio" \
+    --menu "Choose a creative application pack" \
+    audio "Audio — recording, mixing, plugins, notation" \
+    visual "Visual — painting, tattoo design, photography, 3D" \
+    video "Video — editing, streaming, transcoding" \
+    publishing "Publishing — documents, books, page layout" \
+    all "All creative packs" \
+    status "Show installation status")" || exit 0
+
+  if [ "$selection" = status ]; then
+    exec konsole --hold -e /usr/bin/spider-creative-pack status all
+  fi
+  exec konsole --hold -e /usr/bin/spider-creative-pack install "$selection"
+}
+
+command="${1:-list}"
+case "$command" in
+  list)
+    list_packs
+    ;;
+  install)
+    [ "$#" -eq 2 ] || { usage >&2; exit 2; }
+    install_pack "$2"
+    ;;
+  status)
+    [ "$#" -le 2 ] || { usage >&2; exit 2; }
+    show_status "${2:-all}"
+    ;;
+  gui)
+    [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+    show_gui
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

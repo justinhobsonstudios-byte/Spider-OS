@@ -10,8 +10,14 @@ on a mutable security-testing distribution.
 The default image targets Intel and AMD graphics. An Aurora NVIDIA Open image
 can be selected at build time after the Dell GPU is identified.
 
-Ubuntu Studio is a reference for future creative and low-latency audio setup,
+Ubuntu Studio is a reference for creative and low-latency audio setup,
 not the host base. Kali is an isolated Security Lab container, not the desktop.
+
+Spider OS bakes PipeWire/JACK compatibility, RtKit, and Qpwgraph into the host
+image. Ubuntu Studio-equivalent creative applications are delivered as four
+explicitly selected, per-user Flathub packs. They are not embedded into the ISO
+or downloaded silently at first login, which protects both image size and the
+atomic host/application boundary.
 
 ## AI model and authority
 
