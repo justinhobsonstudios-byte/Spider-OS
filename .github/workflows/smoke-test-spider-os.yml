@@ -260,4 +260,4 @@ jobs:
             iso/serial.log
             iso/qemu-status.txt
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
