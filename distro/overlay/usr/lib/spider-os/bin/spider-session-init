@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+mkdir -p "$state_home/spider-os" "$config_home/spider-os"
+
+systemctl --user start spider-webbie.service spider-forage.service >/dev/null 2>&1 || true
+
+cat >"$state_home/spider-os/session.json" <<EOF
+{
+  "desktop": "the-web",
+  "workspace": "the-web",
+  "session": "plasma",
+  "native": true,
+  "browser_shell": false,
+  "status": "ready"
+}
+EOF

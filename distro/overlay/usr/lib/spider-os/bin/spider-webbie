@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Resident Webbie bootstrap for Spider OS 1.0.
+
+This is the native resident-process foundation, not the final reasoning or voice
+stack. It verifies The Weave and publishes inspectable local presence state.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import signal
+import socket
+import time
+from pathlib import Path
+
+WEAVE_SOCKET = Path("/run/spider-os/weave.sock")
+running = True
+
+
+def stop(_signum: int, _frame: object) -> None:
+    global running
+    running = False
+
+
+def state_path() -> Path:
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/tmp/spider-{os.getuid()}"))
+    path = runtime / "spider-os" / "webbie.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def weave_health() -> dict[str, object]:
+    if not WEAVE_SOCKET.exists():
+        return {"ok": False, "error": "weave-socket-missing"}
+    try:
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.settimeout(2)
+        client.connect(str(WEAVE_SOCKET))
+        client.sendall(b'{"op":"health"}')
+        response = client.recv(65536)
+        client.close()
+        data = json.loads(response.decode("utf-8"))
+        return data if isinstance(data, dict) else {"ok": False, "error": "invalid-weave-response"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def write_state(health: dict[str, object]) -> None:
+    payload = {
+        "service": "webbie",
+        "mode": "foundation",
+        "status": "online" if health.get("ok") else "degraded",
+        "weave": health,
+        "voice_required": True,
+        "voice_runtime": "not-yet-wired",
+        "updated": int(time.time()),
+    }
+    target = state_path()
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
+
+
+def main() -> int:
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    while running:
+        write_state(weave_health())
+        for _ in range(15):
+            if not running:
+                break
+            time.sleep(1)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,90 @@
+version: 1
+workspaces:
+  - id: the-web
+    name: The Web
+    tagline: YOUR LIFE. ONE WEB.
+    wallpaper: /usr/share/backgrounds/spider-os/the-web.webp
+    webbie_profile: everyday
+    restore_layout: true
+    capabilities: [threads, anchors, forage, notifications, applications]
+
+  - id: forage
+    name: Forage
+    tagline: SEARCH • CONNECT • DISCOVER
+    wallpaper: /usr/share/backgrounds/spider-os/forage.webp
+    webbie_profile: research
+    restore_layout: true
+    capabilities: [forage.local, forage.semantic, forage.knowledge, forage.deep]
+    modes: [forage, deep-forage]
+
+  - id: studio
+    name: Studio
+    tagline: CREATE • RECORD • SHAPE SOUND
+    wallpaper: /usr/share/backgrounds/spider-os/studio.webp
+    webbie_profile: creative
+    restore_layout: true
+    applications: [ardour, audacity, carla, guitarix, musescore, spider-media-player]
+    capabilities: [audio, midi, media, projects]
+
+  - id: art-lab
+    name: Art Lab
+    tagline: DRAW • INK • BUILD • CREATE
+    wallpaper: /usr/share/backgrounds/spider-os/art-lab.webp
+    webbie_profile: creative
+    restore_layout: true
+    applications: [krita, gimp, inkscape, blender, darktable, skanpage]
+    capabilities: [art, assets, references, scanning, projects]
+
+  - id: dev-bay
+    name: Dev Bay
+    tagline: BUILD • TEST • BREAK • IMPROVE
+    wallpaper: /usr/share/backgrounds/spider-os/dev-bay.webp
+    webbie_profile: developer
+    restore_layout: true
+    applications: [codium, konsole]
+    capabilities: [development, git, build, test, containers, logs]
+
+  - id: study
+    name: Study
+    tagline: LEARN • CONNECT • UNDERSTAND
+    wallpaper: /usr/share/backgrounds/spider-os/study.webp
+    webbie_profile: research
+    restore_layout: true
+    applications: [libreoffice, okular, zotero, firefox]
+    capabilities: [courses, assignments, citations, notes, forage, deep-forage]
+
+  - id: media
+    name: Media
+    tagline: PLAY • WATCH • BROADCAST
+    wallpaper: /usr/share/backgrounds/spider-os/media.webp
+    webbie_profile: creative
+    restore_layout: true
+    applications: [spider-media-player, kdenlive, obs, handbrake]
+    capabilities: [media, playlists, radio, broadcasting, video]
+
+  - id: kali-bay
+    name: Kali Bay
+    tagline: FULL KALI • ISOLATED
+    wallpaper: /usr/share/backgrounds/spider-os/kali-bay.webp
+    webbie_profile: security
+    restore_layout: true
+    isolation: required
+    capabilities: [kali.launch, kali.snapshot, kali.network, kali.share, kali.usb]
+
+  - id: system
+    name: System
+    tagline: CONTROL • PROTECT • MAINTAIN
+    wallpaper: /usr/share/backgrounds/spider-os/system.webp
+    webbie_profile: system
+    restore_layout: true
+    applications: [spider-control]
+    capabilities: [system.health, system.apps, system.updates, system.devices, system.services]
+
+  - id: recovery
+    name: Recovery
+    tagline: REPAIR • RESTORE • RETURN
+    wallpaper: /usr/share/backgrounds/spider-os/recovery.webp
+    webbie_profile: system
+    restore_layout: false
+    applications: [spider-recovery]
+    capabilities: [recovery.boot, recovery.rollback, recovery.packages, recovery.backup, recovery.diagnostics]

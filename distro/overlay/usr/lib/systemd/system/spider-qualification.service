@@ -1,0 +1,14 @@
+[Unit]
+Description=Spider OS installed-system qualification
+ConditionKernelCommandLine=spider.qualification=1
+Requires=spider-weave.service
+After=spider-weave.service display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/spider-os/bin/spider-foundation-verify
+RemainAfterExit=yes
+TimeoutStartSec=240
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=Spider OS Webbie resident service
+Documentation=https://github.com/justinhobsonstudios-byte/Spider-OS
+After=graphical-session-pre.target
+Wants=graphical-session-pre.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/spider-os/bin/spider-webbie
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

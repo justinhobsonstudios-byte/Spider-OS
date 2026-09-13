@@ -1,0 +1,50 @@
+version: 1
+permission_classes:
+  - open
+  - contextual
+  - confirm
+  - elevated
+  - restricted
+capability:
+  required_fields: [id, owner, permission]
+  optional_fields: [workspace, project_required, reversible, network, writes, description]
+examples:
+  - id: media.play
+    owner: spider-media-player
+    permission: open
+    reversible: true
+    writes: false
+  - id: development.run-build
+    owner: dev-bay
+    permission: contextual
+    workspace: dev-bay
+    project_required: true
+    reversible: true
+    writes: true
+  - id: software.install
+    owner: spider-control
+    permission: confirm
+    reversible: true
+    network: true
+    writes: true
+  - id: service.restart
+    owner: spider-control
+    permission: confirm
+    reversible: true
+    writes: true
+  - id: disk.format
+    owner: spider-control
+    permission: elevated
+    reversible: false
+    writes: true
+  - id: kali.execute
+    owner: kali-bay
+    permission: restricted
+    workspace: kali-bay
+    writes: true
+rules:
+  - unknown capabilities are denied
+  - unknown writes fail upward into confirmation, never downward into automatic execution
+  - Webbie invokes capabilities through The Weave and does not receive arbitrary shell execution
+  - restricted Kali capabilities execute only inside the Kali Bay isolation boundary unless a separate host capability is explicitly approved
+  - action results are verified before Webbie reports success when verification is available

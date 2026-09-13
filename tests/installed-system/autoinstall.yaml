@@ -1,0 +1,21 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  identity:
+    hostname: spider-qualification
+    username: spider
+    realname: Spider Qualification
+    password: "$6$spideros$rZ2XQixoEhCzCvSnRkeYGcSckQDIcKJquO8cPOJKuxmSXOY9urcMUEGuGlqbV4r.ht0lZLl2C3sAOoI0PU8VU0"
+  storage:
+    layout:
+      name: direct
+  refresh-installer:
+    update: false
+  updates: security
+  shutdown: poweroff
+  late-commands:
+    - |
+      curtin in-target --target=/target -- bash -c 'mkdir -p /etc/sddm.conf.d && printf "%s\n" "[Autologin]" "User=spider" "Session=plasma" "Relogin=false" > /etc/sddm.conf.d/90-spider-qualification.conf'
