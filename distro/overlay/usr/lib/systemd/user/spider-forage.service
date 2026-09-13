@@ -11,8 +11,6 @@ RestartSec=3s
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=%h/.local/share/spider-os
 
 [Install]
 WantedBy=default.target
