@@ -1,0 +1,13 @@
+PRETTY_NAME="Spider OS 1.0"
+NAME="Spider OS"
+VERSION_ID="1.0"
+VERSION="1.0"
+VERSION_CODENAME=resolute
+ID=spider-os
+ID_LIKE="ubuntu debian"
+HOME_URL="https://github.com/justinhobsonstudios-byte/Spider-OS"
+SUPPORT_URL="https://github.com/justinhobsonstudios-byte/Spider-OS/issues"
+BUG_REPORT_URL="https://github.com/justinhobsonstudios-byte/Spider-OS/issues"
+UBUNTU_CODENAME=resolute
+SPIDER_RELEASE="1.0"
+SPIDER_UPSTREAM="Ubuntu Studio 26.04.1 LTS"
