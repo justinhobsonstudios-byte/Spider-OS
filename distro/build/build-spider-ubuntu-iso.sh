@@ -78,6 +78,10 @@ cat >"$ACTIONS_FILE" <<YAML
     ln -sfn /usr/lib/systemd/user/spider-webbie.service rootfs/etc/systemd/user/default.target.wants/spider-webbie.service
     ln -sfn /usr/lib/systemd/user/spider-forage.service rootfs/etc/systemd/user/default.target.wants/spider-forage.service
 
+    mkdir -p new/iso/.disk
+    printf '%s\n' 'Spider OS 1.0 - Release amd64' > new/iso/.disk/info
+    printf '%s\n' 'Spider OS 1.0' > new/iso/.disk/spider-os
+
 - name: add-cmdline-arg
   arg: spider.live=1
   persist: false
@@ -101,6 +105,10 @@ sha256sum "$OUTPUT_ISO" >"$OUTPUT_ISO.sha256"
 
 xorriso -indev "$OUTPUT_ISO" -pvd_info 2>&1 | tee "$WORK_DIR/pvd-info.txt"
 grep -Fq "Volume id    : 'SPIDER_OS'" "$WORK_DIR/pvd-info.txt"
+
+MEDIA_INFO="$WORK_DIR/media-info.txt"
+xorriso -osirrox on -indev "$OUTPUT_ISO" -extract /.disk/info "$MEDIA_INFO" >/dev/null 2>&1
+grep -Fxq 'Spider OS 1.0 - Release amd64' "$MEDIA_INFO"
 
 cat <<EOF
 Spider OS ISO built successfully.
