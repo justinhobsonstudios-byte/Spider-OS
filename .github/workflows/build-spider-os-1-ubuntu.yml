@@ -8,6 +8,18 @@ on:
         required: false
         default: false
         type: boolean
+  push:
+    branches:
+      - spider-os-1.0-build-2
+    paths:
+      - 'distro/**'
+      - 'weave/**'
+      - 'web/**'
+      - 'webbie/**'
+      - 'forage/**'
+      - 'knowledge/**'
+      - 'tests/installed-system/**'
+      - '.github/workflows/build-spider-os-1-ubuntu.yml'
   pull_request:
     branches:
       - main
@@ -82,7 +94,7 @@ jobs:
   build-and-qualify:
     name: Build, install, reboot, qualify
     needs: validate
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/spider-os-1.0-build-2'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
 
@@ -156,7 +168,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: Spider-OS-1-Qualification
+          name: Spider-OS-1-Build-2-Qualification
           path: |
             out/Spider_OS_1.0_amd64.iso.sha256
             out/qualification/*.log
@@ -165,10 +177,10 @@ jobs:
           retention-days: 3
 
       - name: Upload qualified Spider OS ISO
-        if: ${{ success() && inputs.publish_iso }}
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.publish_iso }}
         uses: actions/upload-artifact@v7
         with:
-          name: Spider-OS-1.0-Ubuntu-Foundation
+          name: Spider-OS-1.0-Build-2
           path: |
             out/Spider_OS_1.0_amd64.iso
             out/Spider_OS_1.0_amd64.iso.sha256
