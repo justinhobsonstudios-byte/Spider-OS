@@ -1,0 +1,18 @@
+[Unit]
+Description=Spider OS Forage local index service
+Documentation=https://github.com/justinhobsonstudios-byte/Spider-OS
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/spider-os/bin/spider-forage
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/spider-os
+
+[Install]
+WantedBy=default.target
