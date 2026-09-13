@@ -23,7 +23,7 @@ for cmd in qemu-system-x86_64 qemu-img; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "Missing command: $cmd" >&2; exit 2; }
 done
 
-"$REPO_ROOT/distro/build/make-qualification-iso.sh" "$SOURCE_ISO" "$QUAL_ISO"
+bash "$REPO_ROOT/distro/build/make-qualification-iso.sh" "$SOURCE_ISO" "$QUAL_ISO"
 qemu-img create -f qcow2 "$DISK" 80G >/dev/null
 
 accel=(-accel 'tcg,thread=multi' -cpu max)
@@ -121,7 +121,7 @@ qemu-system-x86_64 \
   -pidfile "$PIDFILE" \
   -daemonize
 
-for i in $(seq 1 120); do
+for _ in $(seq 1 120); do
   if grep -Fq 'SPIDER_QUALIFICATION_READY' "$BOOT_SERIAL" 2>/dev/null; then
     echo "Spider OS installed-system qualification passed."
     capture_screen "$WORK_DIR/installed-ready.ppm"
