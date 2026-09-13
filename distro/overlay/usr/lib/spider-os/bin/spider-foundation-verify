@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+serial=/dev/ttyS0
+log() {
+  printf '%s\n' "$*" | systemd-cat -t spider-qualification -p info
+  if [[ -w "$serial" ]]; then
+    printf '%s\n' "$*" >"$serial" || true
+  fi
+}
+
+fail() {
+  log "SPIDER_QUALIFICATION_FAILED: $*"
+  exit 1
+}
+
+[[ -r /etc/os-release ]] || fail "/etc/os-release missing"
+grep -Fq 'PRETTY_NAME="Spider OS 1.0"' /etc/os-release || fail "Spider OS identity missing"
+
+systemctl is-active --quiet spider-weave.service || fail "spider-weave.service is not active"
+[[ -S /run/spider-os/weave.sock ]] || fail "The Weave socket is missing"
+
+python3 - <<'PY' || exit 31
+import json
+import socket
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.settimeout(3)
+sock.connect('/run/spider-os/weave.sock')
+sock.sendall(b'{"op":"health"}')
+data = json.loads(sock.recv(65536).decode())
+assert data.get('ok') is True, data
+assert data.get('service') == 'the-weave', data
+PY
+case "$?" in
+  0) ;;
+  *) fail "The Weave health request failed" ;;
+esac
+
+[[ -f /usr/lib/systemd/user/spider-webbie.service ]] || fail "Webbie user service is missing"
+[[ -f /usr/lib/systemd/user/spider-forage.service ]] || fail "Forage user service is missing"
+[[ -f /usr/share/spider-os/workspaces/workspaces.yaml ]] || fail "workspace manifest is missing"
+[[ -f /usr/share/spider-os/manifests/default-apps.yaml ]] || fail "application manifest is missing"
+[[ -f /etc/xdg/autostart/spider-session.desktop ]] || fail "Spider session autostart is missing"
+
+systemctl is-active --quiet display-manager.service || fail "display manager is not active"
+
+# Qualification images configure the test user for SDDM autologin. Give Plasma
+# and the user services time to establish the first native Spider session.
+for _ in $(seq 1 120); do
+  if [[ -f /home/spider/.local/state/spider-os/session.json ]] \
+     && [[ -f /home/spider/.local/share/spider-os/forage/forage.sqlite3 ]] \
+     && pgrep -u spider -x plasmashell >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+[[ -f /home/spider/.local/state/spider-os/session.json ]] || fail "The Web session marker did not appear"
+grep -Fq '"native": true' /home/spider/.local/state/spider-os/session.json || fail "session is not marked native"
+grep -Fq '"browser_shell": false' /home/spider/.local/state/spider-os/session.json || fail "browser-shell regression detected"
+[[ -f /home/spider/.local/share/spider-os/forage/forage.sqlite3 ]] || fail "Forage store did not initialize"
+pgrep -u spider -x plasmashell >/dev/null 2>&1 || fail "Plasma session is not running"
+
+webbie_state="/run/user/$(id -u spider)/spider-os/webbie.json"
+for _ in $(seq 1 30); do
+  [[ -f "$webbie_state" ]] && break
+  sleep 1
+done
+[[ -f "$webbie_state" ]] || fail "Webbie resident state did not appear"
+grep -Fq '"status": "online"' "$webbie_state" || fail "Webbie did not connect to The Weave"
+
+log "SPIDER_QUALIFICATION_READY"
