@@ -1,0 +1,177 @@
+name: Build and Qualify Spider OS 1.0 Ubuntu Foundation
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_iso:
+        description: Upload the ~6.6 GB ISO as a short-lived artifact after qualification
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'distro/**'
+      - 'weave/**'
+      - 'web/**'
+      - 'webbie/**'
+      - 'forage/**'
+      - 'knowledge/**'
+      - 'tests/installed-system/**'
+      - '.github/workflows/build-spider-os-1-ubuntu.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spider-os-1-ubuntu-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Spider OS 1.0 foundation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-yaml shellcheck
+
+      - name: Validate shell and Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n distro/build/build-spider-ubuntu-iso.sh
+          bash -n distro/build/make-qualification-iso.sh
+          bash -n tests/installed-system/run-qemu-qualification.sh
+          bash -n distro/overlay/usr/lib/spider-os/bin/spider-session-init
+          bash -n distro/overlay/usr/lib/spider-os/bin/spider-foundation-verify
+          shellcheck -x distro/build/build-spider-ubuntu-iso.sh
+          shellcheck -x distro/build/make-qualification-iso.sh
+          shellcheck -x tests/installed-system/run-qemu-qualification.sh
+          shellcheck distro/overlay/usr/lib/spider-os/bin/spider-session-init
+          shellcheck distro/overlay/usr/lib/spider-os/bin/spider-foundation-verify
+          python3 -m py_compile \
+            distro/overlay/usr/lib/spider-os/bin/spider-weave \
+            distro/overlay/usr/lib/spider-os/bin/spider-webbie \
+            distro/overlay/usr/lib/spider-os/bin/spider-forage
+
+      - name: Validate manifests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+          for path in (
+              Path('web/workspaces/workspaces.yaml'),
+              Path('distro/manifests/default-apps.yaml'),
+              Path('weave/capabilities/schema.yaml'),
+              Path('tests/installed-system/autoinstall.yaml'),
+          ):
+              with path.open(encoding='utf-8') as f:
+                  yaml.safe_load(f)
+              print(f'valid: {path}')
+          PY
+          grep -Fq 'PRETTY_NAME="Spider OS 1.0"' distro/overlay/etc/os-release
+          grep -Fq '2b25d06203c8a2f60da23e20e3afd1fa400f8ff8104fd074c1b7e49fc3768084' distro/build/upstream.env
+
+  build-and-qualify:
+    name: Build, install, reboot, qualify
+    needs: validate
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
+
+      - name: Install ISO and VM dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            curl \
+            git \
+            gnupg \
+            imagemagick \
+            liblz4-tool \
+            python3-debian \
+            python3-venv \
+            qemu-system-x86 \
+            qemu-utils \
+            rsync \
+            socat \
+            squashfs-tools \
+            xorriso
+
+      - name: Build Spider OS ISO
+        shell: bash
+        env:
+          SPIDER_BUILD_WORK_DIR: ${{ runner.temp }}/spider-build
+          SPIDER_OUTPUT_DIR: ${{ github.workspace }}/out
+        run: |
+          set -euo pipefail
+          bash distro/build/build-spider-ubuntu-iso.sh
+          ls -lh out/Spider_OS_1.0_amd64.iso out/Spider_OS_1.0_amd64.iso.sha256
+
+      - name: Install and qualify in QEMU
+        shell: bash
+        env:
+          SPIDER_BUILD_WORK_DIR: ${{ runner.temp }}/spider-build
+          SPIDER_QUALIFY_WORK_DIR: ${{ github.workspace }}/out/qualification
+        run: |
+          set -euo pipefail
+          bash tests/installed-system/run-qemu-qualification.sh out/Spider_OS_1.0_amd64.iso
+
+      - name: Convert captured displays
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for ppm in out/qualification/*.ppm; do
+            convert "$ppm" "${ppm%.ppm}.png" || true
+          done
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Spider-OS-1-Qualification
+          path: |
+            out/Spider_OS_1.0_amd64.iso.sha256
+            out/qualification/*.log
+            out/qualification/*.png
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Upload qualified Spider OS ISO
+        if: ${{ success() && inputs.publish_iso }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: Spider-OS-1.0-Ubuntu-Foundation
+          path: |
+            out/Spider_OS_1.0_amd64.iso
+            out/Spider_OS_1.0_amd64.iso.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
