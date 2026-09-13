@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Spider OS Session Bootstrap
+Comment=Initialize The Web, Webbie and Forage for the current Plasma session
+Exec=/usr/lib/spider-os/bin/spider-session-init
+OnlyShowIn=KDE;
+NoDisplay=true
+X-KDE-autostart-phase=1
+X-GNOME-Autostart-enabled=true
