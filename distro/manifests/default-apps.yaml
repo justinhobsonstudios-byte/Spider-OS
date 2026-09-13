@@ -1,0 +1,60 @@
+version: 1
+base:
+  - firefox
+  - dolphin
+  - konsole
+  - kate
+  - ark
+  - okular
+  - libreoffice
+  - keepassxc
+  - openssh-client
+  - wireguard-tools
+  - ffmpeg
+studio:
+  - ardour
+  - audacity
+  - carla
+  - guitarix
+  - musescore
+art_lab:
+  - krita
+  - gimp
+  - inkscape
+  - blender
+  - darktable
+  - skanpage
+dev_bay:
+  - codium
+  - git
+  - gh
+  - python3
+  - pipx
+  - nodejs
+  - npm
+  - pnpm
+  - build-essential
+  - cmake
+  - podman
+study:
+  - zotero
+  - pandoc
+media:
+  - kdenlive
+  - obs-studio
+  - handbrake
+spider:
+  - spider-weave
+  - spider-web
+  - spider-webbie
+  - spider-forage
+  - spider-knowledge
+  - spider-control
+  - spider-recovery
+  - spider-media-player
+  - spider-kali-bay
+  - spider-workspaces
+  - spider-branding
+notes:
+  rust: Install and manage through Spider's developer bootstrap rather than pinning an Ubuntu rustc release.
+  vscode: Official Microsoft VS Code is a one-click optional install in Spider Control; VSCodium is the default developer editor.
