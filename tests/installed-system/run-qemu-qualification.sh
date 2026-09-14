@@ -51,6 +51,8 @@ wait_for_exit() {
   return 1
 }
 
+# stop_vm is invoked indirectly by the EXIT trap below.
+# shellcheck disable=SC2317
 stop_vm() {
   if [[ -f "$PIDFILE" ]]; then
     local pid
